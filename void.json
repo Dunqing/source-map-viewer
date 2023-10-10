@@ -1,0 +1,39 @@
+{
+  "$schema": "./node_modules/void/schema.json",
+  "output": "static",
+  "worker": {
+    "compatibility_date": "2026-02-24"
+  },
+  "head": {
+    "htmlAttrs": { "lang": "en" },
+    "meta": [
+      { "charset": "utf-8" },
+      { "name": "viewport", "content": "width=device-width, initial-scale=1" },
+      { "name": "color-scheme", "content": "light dark" },
+      {
+        "name": "description",
+        "content": "Visualize and debug JavaScript/CSS source map mappings. Upload, paste, or fetch source maps to see how generated code positions map back to original source with interactive segment highlighting."
+      },
+      { "property": "og:title", "content": "Source Map Visualization" },
+      {
+        "property": "og:description",
+        "content": "Interactive tool to visualize and debug source map mappings. See how generated code maps back to original source with segment highlighting and diagnostics."
+      },
+      { "property": "og:type", "content": "website" },
+      { "property": "og:url", "content": "https://source-map-visualization.voidzero.dev" },
+      { "name": "twitter:card", "content": "summary" },
+      { "name": "twitter:title", "content": "Source Map Visualization" },
+      {
+        "name": "twitter:description",
+        "content": "Interactive tool to visualize and debug source map mappings. See how generated code maps back to original source."
+      }
+    ],
+    "link": [{ "rel": "icon", "type": "image/svg+xml", "href": "/logo.svg" }],
+    "title": "Source Map Visualization",
+    "script": [
+      {
+        "innerHTML": "if(localStorage.getItem('source-map-viz-theme')==='dark'||(!localStorage.getItem('source-map-viz-theme')&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}if(location.pathname.length>1){document.documentElement.classList.add('has-hash')}"
+      }
+    ]
+  }
+}

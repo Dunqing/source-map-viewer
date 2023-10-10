@@ -1,0 +1,38 @@
+{
+  "name": "source-map-visualization",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp check && vp build",
+    "preview": "vp preview",
+    "test": "vp test",
+    "check": "vp check",
+    "prepare": "vp config"
+  },
+  "dependencies": {
+    "@shikijs/markdown-it": "^4.0.2",
+    "markdown-it": "^14.1.1",
+    "shiki": "^4.0.2",
+    "source-map-js": "^1.2.1",
+    "vue": "^3.5.32"
+  },
+  "devDependencies": {
+    "@iconify-json/carbon": "^1.2.20",
+    "@types/markdown-it": "^14.1.2",
+    "@unocss/reset": "^66.6.8",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "@void/vue": "npm:@void-sdk/vue@^0.4.0",
+    "@vue/test-utils": "^2.4.6",
+    "happy-dom": "^20.9.0",
+    "typescript": "^6.0.3",
+    "unocss": "^66.6.8",
+    "unplugin-icons": "^23.0.1",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:",
+    "void": "npm:@void-sdk/void@^0.5.0"
+  },
+  "packageManager": "pnpm@10.33.0"
+}

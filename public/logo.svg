@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Unified app window -->
+  <rect x="1" y="3" width="30" height="26" rx="3" fill="#fff" stroke="#b0b8c4" stroke-width="0.7"/>
+  <!-- Tab bar -->
+  <rect x="1" y="3" width="30" height="5" rx="3" fill="#e8ebef"/>
+  <rect x="1" y="6" width="30" height="2" fill="#e8ebef"/>
+  <!-- Left tab (original) -->
+  <rect x="3" y="4.5" width="7" height="2.5" rx="0.8" fill="#fff"/>
+  <rect x="4" y="5.2" width="5" height="1" rx="0.5" fill="#4E79A7" opacity="0.6"/>
+  <!-- Right tab (generated) -->
+  <rect x="19" y="4.5" width="7" height="2.5" rx="0.8" fill="#fff"/>
+  <rect x="20" y="5.2" width="5" height="1" rx="0.5" fill="#E15759" opacity="0.6"/>
+  <!-- Panel divider -->
+  <line x1="16" y1="9" x2="16" y2="28" stroke="#d0d5db" stroke-width="0.5"/>
+  <!-- Left panel code lines -->
+  <rect x="3" y="11" width="9" height="1.5" rx="0.7" fill="#c4c9d0"/>
+  <!-- Highlighted source segment -->
+  <rect x="2.5" y="15" width="13" height="4.5" rx="1.5" fill="rgba(78,121,167,0.28)"/>
+  <rect x="3.5" y="16.5" width="5" height="1.5" rx="0.7" fill="#4E79A7"/>
+  <rect x="9" y="16.5" width="5.5" height="1.5" rx="0.7" fill="#4E79A7" opacity="0.65"/>
+  <rect x="3" y="22" width="7" height="1.5" rx="0.7" fill="#c4c9d0"/>
+  <rect x="3" y="25.5" width="10" height="1.5" rx="0.7" fill="#d4d9e0"/>
+  <!-- Right panel code lines -->
+  <rect x="18" y="11" width="11" height="1.5" rx="0.7" fill="#c4c9d0"/>
+  <rect x="18" y="14.5" width="7" height="1.5" rx="0.7" fill="#d4d9e0"/>
+  <rect x="18" y="18" width="9" height="1.5" rx="0.7" fill="#c4c9d0"/>
+  <!-- Highlighted generated segment -->
+  <rect x="16.5" y="22" width="13" height="4.5" rx="1.5" fill="rgba(78,121,167,0.28)"/>
+  <rect x="18" y="23.5" width="4.5" height="1.5" rx="0.7" fill="#4E79A7"/>
+  <rect x="23" y="23.5" width="5.5" height="1.5" rx="0.7" fill="#4E79A7" opacity="0.65"/>
+  <!-- Connector curve between highlighted segments -->
+  <path d="M15.5 17.2 C16 17.2, 16 24.2, 16.5 24.2" stroke="#4E79A7" stroke-width="1.4" stroke-linecap="round"/>
+  <circle cx="15.5" cy="17.2" r="1" fill="#4E79A7"/>
+  <circle cx="16.5" cy="24.2" r="1" fill="#4E79A7"/>
+</svg>
