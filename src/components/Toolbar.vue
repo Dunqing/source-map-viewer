@@ -5,11 +5,18 @@ import IconChartBar from "~icons/carbon/chart-bar";
 import IconDataTable from "~icons/carbon/data-table";
 import IconSun from "~icons/carbon/sun";
 import IconMoon from "~icons/carbon/moon";
+import IconScreen from "~icons/carbon/screen";
 import IconLogoGithub from "~icons/carbon/logo-github";
 import { useTheme } from "../composables/useTheme";
 import { APP_NAME } from "../constants";
 
 const { theme, toggleTheme } = useTheme();
+
+const themeTitle = {
+  light: "Light mode (click for dark)",
+  dark: "Dark mode (click for system)",
+  system: "System mode (click for light)",
+} as const;
 
 defineProps<{
   showStats: boolean;
@@ -79,11 +86,12 @@ const emit = defineEmits<{
     </a>
     <button
       class="p-1.5 rounded text-fg-muted hover:text-fg-dim hover:bg-muted transition"
-      :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+      :title="themeTitle[theme]"
       @click="toggleTheme"
     >
-      <IconSun v-if="theme === 'dark'" class="w-4 h-4" />
-      <IconMoon v-else class="w-4 h-4" />
+      <IconMoon v-if="theme === 'light'" class="w-4 h-4" />
+      <IconSun v-else-if="theme === 'dark'" class="w-4 h-4" />
+      <IconScreen v-else class="w-4 h-4" />
     </button>
   </div>
 </template>

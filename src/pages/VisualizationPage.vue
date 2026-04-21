@@ -141,15 +141,33 @@ function handleMappingClick(segment: MappingSegment) {
 
 async function handleShare() {
   try {
-    const hash = await compressToHash({
-      generatedCode: store.generatedCode,
-      sourceMapJson: store.sourceMapJson,
+    // Try short URL via API
+    const res = await fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        generatedCode: store.generatedCode,
+        sourceMapJson: store.sourceMapJson,
+      }),
     });
-    const url = `${window.location.origin}/${hash}`;
+    if (!res.ok) throw new Error("Share failed");
+    const { url } = await res.json();
     await navigator.clipboard.writeText(url);
-    showToast("URL copied to clipboard");
+    window.history.replaceState(null, "", new URL(url).pathname);
+    showToast("Short URL copied to clipboard");
   } catch {
-    showToast("Failed to copy URL");
+    try {
+      // Fallback to inline hash URL
+      const hash = await compressToHash({
+        generatedCode: store.generatedCode,
+        sourceMapJson: store.sourceMapJson,
+      });
+      const url = `${window.location.origin}/${hash}`;
+      await navigator.clipboard.writeText(url);
+      showToast("URL copied to clipboard");
+    } catch {
+      showToast("Failed to copy URL");
+    }
   }
 }
 </script>

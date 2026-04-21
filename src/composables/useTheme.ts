@@ -1,11 +1,18 @@
-import { ref, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 
-type Theme = "light" | "dark";
+type Theme = "light" | "dark" | "system";
+type ResolvedTheme = "light" | "dark";
 const STORAGE_KEY = "source-map-viz-theme";
-const theme = ref<Theme>("light");
+const theme = ref<Theme>("system");
+const systemPrefersDark = ref(false);
 let initialized = false;
 
-function applyTheme(t: Theme) {
+const resolvedTheme = computed<ResolvedTheme>(() => {
+  if (theme.value === "system") return systemPrefersDark.value ? "dark" : "light";
+  return theme.value;
+});
+
+function applyTheme(t: ResolvedTheme) {
   if (typeof document !== "undefined") {
     document.documentElement.classList.toggle("dark", t === "dark");
     document.documentElement.style.colorScheme = t;
@@ -14,9 +21,16 @@ function applyTheme(t: Theme) {
 
 // Module-level watcher — not tied to any component's lifecycle,
 // so it survives when LandingPage unmounts on navigation.
-watch(theme, (newTheme) => {
-  localStorage.setItem(STORAGE_KEY, newTheme);
+watch(resolvedTheme, (newTheme) => {
   applyTheme(newTheme);
+});
+
+watch(theme, (newTheme) => {
+  if (newTheme === "system") {
+    localStorage.removeItem(STORAGE_KEY);
+  } else {
+    localStorage.setItem(STORAGE_KEY, newTheme);
+  }
 });
 
 export function useTheme() {
@@ -26,27 +40,29 @@ export function useTheme() {
     if (initialized) return;
     initialized = true;
 
-    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
-    if (stored) {
+    systemPrefersDark.value = mql.matches;
+
+    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
+    if (stored === "light" || stored === "dark") {
       theme.value = stored;
-    } else if (mql.matches) {
-      theme.value = "dark";
+    } else {
+      theme.value = "system";
     }
-    applyTheme(theme.value);
+    applyTheme(resolvedTheme.value);
 
     // Listener lives for page lifetime (singleton pattern — initialized guard
     // ensures only one listener exists). No cleanup needed.
     mql.addEventListener("change", (e) => {
-      if (!localStorage.getItem(STORAGE_KEY)) {
-        theme.value = e.matches ? "dark" : "light";
-      }
+      systemPrefersDark.value = e.matches;
     });
   });
 
   function toggleTheme() {
-    theme.value = theme.value === "light" ? "dark" : "light";
+    const order: Theme[] = ["light", "dark", "system"];
+    const idx = order.indexOf(theme.value);
+    theme.value = order[(idx + 1) % order.length];
   }
 
-  return { theme, toggleTheme };
+  return { theme, resolvedTheme, toggleTheme };
 }

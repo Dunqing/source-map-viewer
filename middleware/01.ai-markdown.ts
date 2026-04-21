@@ -1,4 +1,5 @@
 import { defineMiddleware } from "void";
+import { shares, SHARE_TTL } from "../src/server/shares";
 import { parseSourceMapLite } from "../src/core/parser-lite";
 import { buildMappingIndex } from "../src/core/mapper";
 import { validateMappings } from "../src/core/validator";
@@ -29,12 +30,34 @@ function shouldServeMarkdown(req: { header(name: string): string | undefined }):
   return false;
 }
 
+/** Short IDs are 8 alphanumeric chars. Long hashes are base64url compressed data. */
+function isShortId(slug: string): boolean {
+  return /^[A-Za-z0-9]{8}$/.test(slug);
+}
+
+async function resolveData(
+  slug: string,
+  ctx?: { waitUntil(promise: Promise<unknown>): void },
+): Promise<{ generatedCode: string; sourceMapJson: string } | null> {
+  // Try KV lookup for short IDs first
+  if (isShortId(slug)) {
+    const stored = await shares.get(slug);
+    if (stored) {
+      // Renew TTL on access
+      ctx?.waitUntil(shares.put(slug, stored, { ttl: SHARE_TTL }));
+      return stored;
+    }
+  }
+  // Fall back to inline decompression for long hashes
+  return decompressFromHash(slug);
+}
+
 export default defineMiddleware(async (c, next) => {
   const url = new URL(c.req.url);
   const path = url.pathname;
 
-  // Skip root, static assets, and Void internals
-  if (path === "/" || path.includes(".") || path.startsWith("/__")) {
+  // Skip root, static assets, API routes, and Void internals
+  if (path === "/" || path.includes(".") || path.startsWith("/__") || path.startsWith("/api/")) {
     return next();
   }
 
@@ -43,18 +66,13 @@ export default defineMiddleware(async (c, next) => {
     return next();
   }
 
-  // Browser requests — serve the index page (SPA handles /s/<hash> client-side)
+  // Browser requests — pass through to Void's page handler
   if (!shouldServeMarkdown(c.req)) {
-    const indexUrl = new URL("/", c.req.url);
-    const resp = await fetch(indexUrl.toString());
-    return new Response(resp.body, {
-      status: resp.status,
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
+    return next();
   }
 
-  const hash = match[1];
-  const data = await decompressFromHash(hash);
+  const slug = match[1];
+  const data = await resolveData(slug, c.executionCtx);
   if (!data) {
     return c.text("Failed to decode source map data", 400);
   }
@@ -72,7 +90,7 @@ export default defineMiddleware(async (c, next) => {
   const diagnostics = validateMappings(parsedData);
   const badSegmentSet = new Set(diagnostics.map((d) => d.segment));
 
-  const visualizationUrl = `${url.origin}/${hash}`;
+  const visualizationUrl = `${url.origin}/${slug}`;
 
   const markdown = generateDebugPrompt({
     generatedCode,

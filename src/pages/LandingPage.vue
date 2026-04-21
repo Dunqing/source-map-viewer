@@ -37,9 +37,25 @@ const loading = ref(false);
 async function navigateWithData(generatedCode: string, sourceMapJson: string, label: string) {
   store.loadSourceMap(generatedCode, sourceMapJson);
   if (store.error) throw new Error(store.error);
-  const hash = await compressToHash({ generatedCode, sourceMapJson });
-  addHistoryEntry({ label, hash, timestamp: Date.now() });
-  window.history.pushState(null, "", `/${hash}`);
+
+  // Create short URL via API, fall back to inline hash
+  let path: string;
+  try {
+    const res = await fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ generatedCode, sourceMapJson }),
+    });
+    if (!res.ok) throw new Error();
+    const { id } = await res.json();
+    path = `/${id}`;
+  } catch {
+    const hash = await compressToHash({ generatedCode, sourceMapJson });
+    path = `/${hash}`;
+  }
+
+  addHistoryEntry({ label, hash: path.slice(1), timestamp: Date.now() });
+  window.history.pushState(null, "", path);
   window.dispatchEvent(new CustomEvent("smv-navigate"));
 }
 

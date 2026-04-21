@@ -25,7 +25,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useSourceMapStore();
-const { theme } = useTheme();
+const { resolvedTheme } = useTheme();
 const { tokenizeLines, detectLanguage, loading: highlighterLoading } = useHighlighter();
 
 const containerRef = ref<HTMLElement | null>(null);
@@ -44,7 +44,7 @@ const {
 
 const allTokens = computed<ThemedToken[][]>(() => {
   if (!props.code) return [];
-  void theme.value; // explicit dependency — re-tokenize on theme change
+  void resolvedTheme.value; // explicit dependency — re-tokenize on theme change
   const lang = detectLanguage(props.filename);
   return tokenizeLines(props.code, lang);
 });

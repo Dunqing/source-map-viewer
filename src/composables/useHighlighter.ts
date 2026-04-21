@@ -20,7 +20,7 @@ export function detectLanguage(filename: string): string {
 }
 
 export function useHighlighter() {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
 
   async function init() {
     if (highlighter.value) return;
@@ -35,7 +35,7 @@ export function useHighlighter() {
 
   function tokenizeLines(code: string, lang: string): ThemedToken[][] {
     if (!highlighter.value) return [];
-    const themeName = theme.value === "dark" ? "github-dark" : "github-light";
+    const themeName = resolvedTheme.value === "dark" ? "github-dark" : "github-light";
     return highlighter.value.codeToTokensBase(code, { lang, theme: themeName });
   }
 

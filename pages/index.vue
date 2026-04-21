@@ -14,11 +14,23 @@ function getHashFromUrl(): string {
   return pathMatch ? pathMatch[1] : "";
 }
 
+async function resolveSlug(slug: string) {
+  // Try inline decompression first (long hash URLs)
+  const inline = await decompressFromHash(slug);
+  if (inline) return inline;
+  // Fall back to KV lookup (short IDs)
+  try {
+    const res = await fetch(`/api/share/${slug}`);
+    if (res.ok) return res.json();
+  } catch {}
+  return null;
+}
+
 async function handleNavigation() {
-  const hash = getHashFromUrl();
-  if (hash) {
+  const slug = getHashFromUrl();
+  if (slug) {
     if (!store.parsedData) {
-      const data = await decompressFromHash(hash);
+      const data = await resolveSlug(slug);
       if (data) {
         store.loadSourceMap(data.generatedCode, data.sourceMapJson);
       }
