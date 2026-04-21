@@ -55,6 +55,10 @@ function copyPrompt() {
       <div class="flex items-center justify-between px-4 py-3 border-b border-edge">
         <h2 class="text-sm font-semibold">AI Debug Prompt</h2>
         <div class="flex items-center gap-2">
+          <span class="text-xs text-fg-muted"
+            >Tip: AI tools like Claude Code and Codex get this automatically when fetching the
+            shared URL</span
+          >
           <button
             class="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition"
             @click="copyPrompt"

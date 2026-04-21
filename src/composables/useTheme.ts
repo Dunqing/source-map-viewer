@@ -19,13 +19,16 @@ function applyTheme(t: ResolvedTheme) {
   }
 }
 
-// Module-level watcher — not tied to any component's lifecycle,
-// so it survives when LandingPage unmounts on navigation.
+// Module-level watchers — not tied to any component's lifecycle,
+// so they survive when LandingPage unmounts on navigation.
+// Guarded by `initialized` to skip the redundant write during init
+// (theme is set from localStorage, no need to write it back).
 watch(resolvedTheme, (newTheme) => {
-  applyTheme(newTheme);
+  if (initialized) applyTheme(newTheme);
 });
 
 watch(theme, (newTheme) => {
+  if (!initialized) return;
   if (newTheme === "system") {
     localStorage.removeItem(STORAGE_KEY);
   } else {
