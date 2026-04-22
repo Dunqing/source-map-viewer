@@ -108,4 +108,20 @@ html.dark .prose .shiki span {
 html.dark .prose .shiki {
   background-color: var(--c-bg-mute) !important;
 }
+.prose table {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  border-collapse: collapse;
+}
+.prose table th,
+.prose table td {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--c-border);
+  white-space: nowrap;
+}
+.prose table code {
+  white-space: pre;
+}
 </style>
