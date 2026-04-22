@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vite-plus/test";
+import { describe, it, expect, vi, afterEach } from "vite-plus/test";
 import { useFileLoader } from "../composables/useFileLoader";
 
 // A real, minimal but valid source map

@@ -25,7 +25,7 @@ describe("useShareableUrl", () => {
 
   it("returns null for valid compressed JSON with wrong shape", async () => {
     // Compress a valid JSON object that doesn't match ShareableData
-    const hash = await compressToHash({ generatedCode: "x", sourceMapJson: '{"version":3}' });
+    await compressToHash({ generatedCode: "x", sourceMapJson: '{"version":3}' });
 
     // Tamper: compress a different shape through the same pipeline
     const badData = JSON.stringify({ foo: "bar", baz: 123 });

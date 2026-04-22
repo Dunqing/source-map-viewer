@@ -153,8 +153,6 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
   const header = "| Gen | Generated code | → | Orig | Original code | Source | |";
   const divider = "|-----|---------------|---|------|--------------|--------|---|";
 
-  const rawMappings = sourceMapJson ? JSON.parse(sourceMapJson).mappings : "";
-
   const hasIssues = badCount > 0 || qualityWarnings.length > 0;
 
   const sections = [
