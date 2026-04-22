@@ -1,6 +1,6 @@
 import { computed, ref, onMounted } from "vue";
 import { useSourceMapStore } from "../stores/sourceMap";
-import { generateDebugPrompt } from "../core/prompt";
+import { generateDebugPrompt, analyzeQuality } from "../core/prompt";
 
 export function useAiDebugPrompt() {
   const store = useSourceMapStore();
@@ -13,6 +13,9 @@ export function useAiDebugPrompt() {
   const prompt = computed(() => {
     if (!store.parsedData) return "";
 
+    const coveragePercent = store.stats?.coveragePercent ?? 0;
+    const qualityWarnings = analyzeQuality(store.parsedData, store.generatedCode, coveragePercent);
+
     return generateDebugPrompt({
       generatedCode: store.generatedCode,
       sourceMapJson: store.sourceMapJson,
@@ -20,6 +23,8 @@ export function useAiDebugPrompt() {
       mappingIndex: store.mappingIndex,
       diagnostics: store.diagnostics,
       badSegmentSet: store.badSegmentSet,
+      qualityWarnings,
+      coveragePercent,
       visualizationUrl: visualizationUrl.value,
     });
   });

@@ -109,9 +109,7 @@ html.dark .prose .shiki {
   background-color: var(--c-bg-mute) !important;
 }
 .prose table {
-  display: block;
-  overflow-x: auto;
-  white-space: nowrap;
+  width: max-content;
   font-size: 0.75rem;
   border-collapse: collapse;
 }

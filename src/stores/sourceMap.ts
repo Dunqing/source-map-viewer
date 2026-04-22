@@ -8,7 +8,7 @@ import type {
   SourceMapStats,
 } from "../core/types";
 import { parseSourceMap } from "../core/parser";
-import { buildInverseMappingIndex, buildMappingIndex } from "../core/mapper";
+import { buildInverseMappingIndex, buildMappingIndex, clampOriginalPosition } from "../core/mapper";
 import { validateMappings } from "../core/validator";
 import { calculateStats } from "../core/stats";
 
@@ -39,6 +39,25 @@ function createSourceMapStore() {
   const badSegmentSet = computed(
     () => new Set<MappingSegment>(diagnostics.value.map((d) => d.segment)),
   );
+
+  /** Segments whose original position was clamped (out-of-bounds in source content). */
+  const clampedSegmentSet = computed(() => {
+    const data = parsedData.value;
+    if (!data) return new Set<MappingSegment>();
+
+    const set = new Set<MappingSegment>();
+    const sourceLines = data.sourcesContent.map((c) => (c !== null ? c.split("\n") : null));
+
+    for (const seg of data.mappings) {
+      const lines = sourceLines[seg.sourceIndex];
+      if (!lines) continue;
+      const clamped = clampOriginalPosition(seg.originalLine, seg.originalColumn, lines);
+      if (clamped.line !== seg.originalLine || clamped.column !== seg.originalColumn) {
+        set.add(seg);
+      }
+    }
+    return set;
+  });
 
   function loadSourceMap(code: string, mapJson: string) {
     try {
@@ -105,6 +124,7 @@ function createSourceMapStore() {
     activeSourceName,
     sourceCount,
     badSegmentSet,
+    clampedSegmentSet,
     loadSourceMap,
     setActiveSource,
     setHoveredSegment,

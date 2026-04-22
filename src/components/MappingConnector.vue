@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onUnmounted } from "vue";
 import { useSourceMapStore } from "../stores/sourceMap";
+import { clampOriginalPosition } from "../core/mapper";
 import type { MappingSegment } from "../core/types";
 
 type Panel = {
@@ -82,21 +83,76 @@ interface ConnectorData {
 
 const connector = ref<ConnectorData | null>(null);
 const curvePath = ref("");
+const isClamped = ref(false);
 let rafId = 0;
 let prevConnector: ConnectorData | null = null;
+
+/**
+ * Compute the visual column of the first non-whitespace character,
+ * accounting for tabs (rendered at 8-space tab stops in `whitespace: pre`).
+ * Returns the original column if it's already past the indentation.
+ */
+function visualColSkippingIndent(code: string | undefined, line: number, col: number): number {
+  if (!code) return col;
+  const lineText = code.split("\n")[line];
+  if (!lineText) return col;
+  const firstCode = lineText.search(/\S/);
+  if (firstCode < 0) return col; // all-whitespace line
+
+  // Calculate visual width of the indentation
+  let visualIndent = 0;
+  for (let i = 0; i < firstCode; i++) {
+    if (lineText[i] === "\t") {
+      // Tab stop at multiples of 8 (CSS default tab-size)
+      visualIndent = Math.ceil((visualIndent + 1) / 8) * 8;
+    } else {
+      visualIndent++;
+    }
+  }
+
+  // Also calculate visual column for the requested col
+  let visualCol = 0;
+  for (let i = 0; i < Math.min(col, lineText.length); i++) {
+    if (lineText[i] === "\t") {
+      visualCol = Math.ceil((visualCol + 1) / 8) * 8;
+    } else {
+      visualCol++;
+    }
+  }
+
+  return Math.max(visualCol, visualIndent);
+}
 
 function calcConnector(seg: MappingSegment): ConnectorData | null {
   if (!props.originalPanel || !props.generatedPanel) return null;
 
-  const origPos = props.originalPanel.getViewportPosition(seg.originalLine, seg.originalColumn);
-  const genPos = props.generatedPanel.getViewportPosition(seg.generatedLine, seg.generatedColumn);
+  // Use clamped positions for the original side to avoid pointing into empty space
+  const sourceContent = store.parsedData?.sourcesContent[seg.sourceIndex];
+  const sourceLines = sourceContent ? sourceContent.split("\n") : [];
+  const clamped = clampOriginalPosition(seg.originalLine, seg.originalColumn, sourceLines);
+
+  // Skip leading whitespace so connector starts at actual code, not tabs/spaces
+  const origVisualCol = visualColSkippingIndent(sourceContent, clamped.line, clamped.column);
+  const genVisualCol = visualColSkippingIndent(
+    store.generatedCode,
+    seg.generatedLine,
+    seg.generatedColumn,
+  );
+
+  const origPos = props.originalPanel.getViewportPosition(clamped.line, origVisualCol);
+  const genPos = props.generatedPanel.getViewportPosition(seg.generatedLine, genVisualCol);
   if (!origPos || !genPos) return null;
 
   const origCharW = props.originalPanel.getCharWidth();
   const genCharW = props.generatedPanel.getCharWidth();
   const endCols = getSegmentEndColumns(seg);
-  const origWidth = (endCols.orig - seg.originalColumn) * origCharW;
-  const genWidth = (endCols.gen - seg.generatedColumn) * genCharW;
+
+  // Convert end columns to visual columns for correct width
+  const origEndCol = Math.min(endCols.orig, sourceLines[clamped.line]?.length ?? endCols.orig);
+  const origEndVisual = visualColSkippingIndent(sourceContent, clamped.line, origEndCol);
+  const genEndVisual = visualColSkippingIndent(store.generatedCode, seg.generatedLine, endCols.gen);
+  const origWidth = Math.max(origCharW, (origEndVisual - origVisualCol) * origCharW);
+  const genWidth = Math.max(genCharW, (genEndVisual - genVisualCol) * genCharW);
 
   return {
     origBox: { x: origPos.x, y: origPos.top, w: origWidth, h: origPos.height },
@@ -168,8 +224,10 @@ function updateLoop() {
   if (!seg) {
     connector.value = null;
     curvePath.value = "";
+    isClamped.value = false;
     return;
   }
+  isClamped.value = store.clampedSegmentSet.has(seg);
   const c = calcConnector(seg);
   if (c) {
     const prev = prevConnector;
@@ -206,6 +264,7 @@ watch(
     } else {
       connector.value = null;
       curvePath.value = "";
+      isClamped.value = false;
     }
   },
 );
@@ -231,10 +290,11 @@ onUnmounted(() => cancelAnimationFrame(rafId));
         v-if="connector"
         :d="curvePath"
         fill="none"
-        :stroke="curveColor"
-        stroke-width="1.5"
+        :stroke="isClamped ? 'var(--connector-clamped, #ef4444)' : curveColor"
+        :stroke-width="isClamped ? 1 : 1.5"
         stroke-linecap="round"
         stroke-linejoin="round"
+        :stroke-dasharray="isClamped ? '4 3' : 'none'"
       />
     </svg>
   </Teleport>

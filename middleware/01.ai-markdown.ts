@@ -3,7 +3,8 @@ import { shares, SHARE_TTL } from "../src/server/shares";
 import { parseSourceMapLite } from "../src/core/parser-lite";
 import { buildMappingIndex } from "../src/core/mapper";
 import { validateMappings } from "../src/core/validator";
-import { generateDebugPrompt } from "../src/core/prompt";
+import { generateDebugPrompt, analyzeQuality } from "../src/core/prompt";
+import { calculateStats } from "../src/core/stats";
 import { decompressFromHash } from "../src/composables/useShareableUrl";
 
 const AI_BOT_PATTERNS = [
@@ -96,6 +97,9 @@ export default defineMiddleware(async (c, next) => {
 
   const visualizationUrl = `${url.origin}/${slug}`;
 
+  const stats = calculateStats(parsedData, generatedCode, diagnostics, mappingIndex);
+  const qualityWarnings = analyzeQuality(parsedData, generatedCode, stats.coveragePercent);
+
   const markdown = generateDebugPrompt({
     generatedCode,
     sourceMapJson,
@@ -103,6 +107,8 @@ export default defineMiddleware(async (c, next) => {
     mappingIndex,
     diagnostics,
     badSegmentSet,
+    qualityWarnings,
+    coveragePercent: stats.coveragePercent,
     visualizationUrl,
   });
 
