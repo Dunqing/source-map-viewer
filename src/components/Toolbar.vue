@@ -85,7 +85,7 @@ const emit = defineEmits<{
     </button>
     <div class="w-px h-4 bg-edge mx-0.5" />
     <a
-      href="https://github.com/Dunqing/source-map-visualization"
+      href="https://github.com/Dunqing/source-map-viewer"
       target="_blank"
       rel="noopener"
       class="p-1.5 rounded text-fg-muted hover:text-fg-dim hover:bg-muted transition"

@@ -50,7 +50,7 @@ const jsonLd = JSON.stringify({
       </ul>
       <p>This tool requires JavaScript to run. Please enable JavaScript in your browser.</p>
       <p>
-        <a href="https://github.com/Dunqing/source-map-visualization">View source on GitHub</a>
+        <a href="https://github.com/Dunqing/source-map-viewer">View source on GitHub</a>
       </p>
     </div>
   </noscript>

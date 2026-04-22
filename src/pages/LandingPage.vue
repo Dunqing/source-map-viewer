@@ -353,7 +353,7 @@ function formatTimeAgo(timestamp: number): string {
         class="border-t border-edge pt-4 flex items-center justify-between text-xs text-fg-muted"
       >
         <a
-          href="https://github.com/Dunqing/source-map-visualization"
+          href="https://github.com/Dunqing/source-map-viewer"
           target="_blank"
           rel="noopener"
           class="flex items-center gap-1 hover:text-fg-dim transition"
