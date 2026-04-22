@@ -15,7 +15,7 @@ const statusText = computed(() => {
   const source = store.parsedData?.sources[seg.sourceIndex] ?? "unknown";
   const name = seg.nameIndex !== null ? store.parsedData?.names[seg.nameIndex] : null;
 
-  return `Generated ${seg.generatedLine + 1}:${seg.generatedColumn} → ${source} ${seg.originalLine + 1}:${seg.originalColumn}${name ? ` (${name})` : ""}`;
+  return `${source} ${seg.originalLine + 1}:${seg.originalColumn}${name ? ` (${name})` : ""} → Generated ${seg.generatedLine + 1}:${seg.generatedColumn}`;
 });
 </script>
 

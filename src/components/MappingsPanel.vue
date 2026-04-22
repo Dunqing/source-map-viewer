@@ -88,10 +88,10 @@ const summary = computed(() => {
 const copied = ref(false);
 
 function copyMappings() {
-  const header = `| Gen | Generated code | → | Orig | Original code | Source |${store.parsedData?.names?.length ? " Name |" : ""}`;
-  const divider = `|-----|---------------|---|------|--------------|--------|${store.parsedData?.names?.length ? "------|" : ""}`;
+  const header = `| Orig | Original code | → | Gen | Generated code | Source |${store.parsedData?.names?.length ? " Name |" : ""}`;
+  const divider = `|------|--------------|---|-----|---------------|--------|${store.parsedData?.names?.length ? "------|" : ""}`;
   const rows = mappings.value.map((m) => {
-    const base = `| ${m.genLine}:${m.genCol} | \`${m.genSnippet}\` | → | ${m.origLine}:${m.origCol} | \`${m.origSnippet}\` | ${m.source} |`;
+    const base = `| ${m.origLine}:${m.origCol} | \`${m.origSnippet}\` | → | ${m.genLine}:${m.genCol} | \`${m.genSnippet}\` | ${m.source} |`;
     return store.parsedData?.names?.length ? `${base} ${m.name ?? ""} |` : base;
   });
 
@@ -131,11 +131,11 @@ function copyMappings() {
       <table class="w-full">
         <thead class="sticky top-0 bg-muted">
           <tr class="text-left text-fg-muted">
-            <th class="px-2 py-1 w-20">Gen</th>
-            <th class="px-2 py-1">Generated code</th>
-            <th class="px-2 py-1 w-8 text-center">→</th>
             <th class="px-2 py-1 w-20">Orig</th>
             <th class="px-2 py-1">Original code</th>
+            <th class="px-2 py-1 w-8 text-center">→</th>
+            <th class="px-2 py-1 w-20">Gen</th>
+            <th class="px-2 py-1">Generated code</th>
             <th class="px-2 py-1 w-24">Source</th>
             <th v-if="store.parsedData?.names?.length" class="px-2 py-1 w-20">Name</th>
           </tr>
@@ -154,18 +154,18 @@ function copyMappings() {
             @mouseleave="store.setHoveredSegment(null)"
             @click="emit('clickMapping', m.seg)"
           >
-            <td class="px-2 py-0.5 text-blue-600 dark:text-blue-400 whitespace-nowrap">
-              {{ m.genLine }}:{{ m.genCol }}
-            </td>
-            <td class="px-2 py-0.5 text-fg-dim truncate max-w-48">
-              {{ m.genSnippet }}
-            </td>
-            <td class="px-2 py-0.5 text-fg-muted text-center">→</td>
             <td class="px-2 py-0.5 text-green-600 dark:text-green-400 whitespace-nowrap">
               {{ m.origLine }}:{{ m.origCol }}
             </td>
             <td class="px-2 py-0.5 text-fg-dim truncate max-w-48">
               {{ m.origSnippet }}
+            </td>
+            <td class="px-2 py-0.5 text-fg-muted text-center">→</td>
+            <td class="px-2 py-0.5 text-blue-600 dark:text-blue-400 whitespace-nowrap">
+              {{ m.genLine }}:{{ m.genCol }}
+            </td>
+            <td class="px-2 py-0.5 text-fg-dim truncate max-w-48">
+              {{ m.genSnippet }}
             </td>
             <td class="px-2 py-0.5 text-fg-muted truncate">{{ m.source }}</td>
             <td
