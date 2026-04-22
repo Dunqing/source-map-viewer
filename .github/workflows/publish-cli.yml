@@ -18,16 +18,16 @@ jobs:
           run-install: false
       - uses: actions/setup-node@v4
         with:
+          node-version: 24
           registry-url: https://npm.pkg.github.com
           scope: "@void-sdk"
       - run: vp install
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       - run: vp run --filter source-map-viewer build
-      # Switch registry to npmjs for publish
+      # Switch registry to npmjs for publish via npm trusted publishing (OIDC).
       - uses: actions/setup-node@v4
         with:
+          node-version: 24
           registry-url: https://registry.npmjs.org
       - run: vp pm publish --filter source-map-viewer --no-git-checks -- --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
