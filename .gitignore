@@ -6,3 +6,4 @@ dist
 .wrangler
 .superpowers
 docs/superpowers
+packages/cli/void.json
