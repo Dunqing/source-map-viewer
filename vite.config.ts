@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite-plus";
+import vue from "@vitejs/plugin-vue";
 import { voidPlugin } from "void";
 import { voidVue } from "@void/vue/plugin";
 import UnoCSS from "unocss/vite";
@@ -130,7 +131,7 @@ export default defineConfig({
   },
   plugins: [
     unocssDevSSRInject(),
-    ...(!isTest ? [voidPlugin(), voidVue()] : []),
+    ...(isTest ? [vue()] : [voidPlugin(), voidVue()]),
     UnoCSS(),
     Icons({ compiler: "vue3", autoInstall: true }),
   ],
