@@ -1,4 +1,58 @@
-import type { MappingDiagnostic, SourceMapData } from "./types";
+import type {
+  InverseMappingIndex,
+  MappingDiagnostic,
+  MappingIndex,
+  MappingSegment,
+  SourceMapData,
+} from "./types";
+
+function isIdentifierChar(char: string | undefined): boolean {
+  return char !== undefined && /[A-Za-z0-9_$]/.test(char);
+}
+
+function splitsIdentifierAt(lineText: string | undefined, column: number): boolean {
+  if (!lineText || column <= 0 || column >= lineText.length) return false;
+  return isIdentifierChar(lineText[column - 1]) && isIdentifierChar(lineText[column]);
+}
+
+function markTokenSplitSegments(
+  segments: MappingSegment[],
+  getLine: (segment: MappingSegment) => number,
+  getColumn: (segment: MappingSegment) => number,
+  getLineText: (segment: MappingSegment, line: number) => string | undefined,
+  result: Set<MappingSegment>,
+) {
+  let previousLine = -1;
+  let previousGroup: MappingSegment[] | null = null;
+
+  for (let i = 0; i < segments.length; ) {
+    const segment = segments[i];
+    const line = getLine(segment);
+    const column = getColumn(segment);
+    const group: MappingSegment[] = [];
+
+    while (
+      i < segments.length &&
+      getLine(segments[i]) === line &&
+      getColumn(segments[i]) === column
+    ) {
+      group.push(segments[i]);
+      i++;
+    }
+
+    if (
+      previousGroup &&
+      previousLine === line &&
+      splitsIdentifierAt(getLineText(segment, line), column)
+    ) {
+      for (const previous of previousGroup) result.add(previous);
+      for (const current of group) result.add(current);
+    }
+
+    previousLine = line;
+    previousGroup = group;
+  }
+}
 
 export function validateMappings(data: SourceMapData): MappingDiagnostic[] {
   const diagnostics: MappingDiagnostic[] = [];
@@ -32,4 +86,37 @@ export function validateMappings(data: SourceMapData): MappingDiagnostic[] {
   }
 
   return diagnostics;
+}
+
+export function findTokenSplitSegments(
+  data: SourceMapData,
+  generatedCode: string,
+  mappingIndex: MappingIndex,
+  inverseMappingIndex: InverseMappingIndex,
+): Set<MappingSegment> {
+  const result = new Set<MappingSegment>();
+  const generatedLines = generatedCode.split("\n");
+  const sourceLines = data.sourcesContent.map((content) => content?.split("\n") ?? null);
+
+  markTokenSplitSegments(
+    mappingIndex,
+    (segment) => segment.generatedLine,
+    (segment) => segment.generatedColumn,
+    (_segment, line) => generatedLines[line],
+    result,
+  );
+
+  for (const [sourceIndex, segments] of inverseMappingIndex) {
+    const lines = sourceLines[sourceIndex];
+    if (!lines) continue;
+    markTokenSplitSegments(
+      segments,
+      (segment) => segment.originalLine,
+      (segment) => segment.originalColumn,
+      (_segment, line) => lines[line],
+      result,
+    );
+  }
+
+  return result;
 }

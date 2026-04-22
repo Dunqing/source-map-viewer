@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useSourceMapStore } from "../stores/sourceMap";
 
 const store = useSourceMapStore();
+const suspiciousMappings = computed(() => store.splitTokenSegmentSet.size);
 </script>
 
 <template>
@@ -30,6 +32,20 @@ const store = useSourceMapStore();
         </dt>
         <dd class="font-mono" :class="store.stats.badMappings > 0 ? 'text-red-500' : ''">
           {{ store.stats.badMappings }}
+        </dd>
+      </div>
+      <div class="flex justify-between">
+        <dt
+          class="text-fg-muted"
+          :style="suspiciousMappings > 0 ? { color: 'var(--connector-suspicious)' } : undefined"
+        >
+          Suspicious mappings
+        </dt>
+        <dd
+          class="font-mono"
+          :style="suspiciousMappings > 0 ? { color: 'var(--connector-suspicious)' } : undefined"
+        >
+          {{ suspiciousMappings }}
         </dd>
       </div>
     </dl>

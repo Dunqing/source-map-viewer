@@ -1,8 +1,8 @@
 import { defineMiddleware } from "void";
 import { shares, SHARE_TTL } from "../src/server/shares";
 import { parseSourceMapLite } from "../src/core/parser-lite";
-import { buildMappingIndex } from "../src/core/mapper";
-import { validateMappings } from "../src/core/validator";
+import { buildInverseMappingIndex, buildMappingIndex } from "../src/core/mapper";
+import { findTokenSplitSegments, validateMappings } from "../src/core/validator";
 import { generateDebugPrompt, analyzeQuality } from "../src/core/prompt";
 import { calculateStats } from "../src/core/stats";
 import { decompressFromHash } from "../src/composables/useShareableUrl";
@@ -92,8 +92,15 @@ export default defineMiddleware(async (c, next) => {
   }
 
   const mappingIndex = buildMappingIndex(parsedData.mappings);
+  const inverseMappingIndex = buildInverseMappingIndex(parsedData.mappings);
   const diagnostics = validateMappings(parsedData);
   const badSegmentSet = new Set(diagnostics.map((d) => d.segment));
+  const splitTokenSegmentSet = findTokenSplitSegments(
+    parsedData,
+    generatedCode,
+    mappingIndex,
+    inverseMappingIndex,
+  );
 
   const visualizationUrl = `${url.origin}/${slug}`;
 
@@ -107,6 +114,7 @@ export default defineMiddleware(async (c, next) => {
     mappingIndex,
     diagnostics,
     badSegmentSet,
+    splitTokenSegmentSet,
     qualityWarnings,
     coveragePercent: stats.coveragePercent,
     visualizationUrl,

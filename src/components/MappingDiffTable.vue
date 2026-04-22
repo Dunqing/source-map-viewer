@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import type { DiffEntry, DiffSummary } from "../core/diff";
-import { extractSnippet } from "../core/snippets";
+import { extractGeneratedSnippet, extractOriginalSnippet } from "../core/snippets";
 
 const props = defineProps<{
   entries: DiffEntry[];
@@ -53,7 +53,7 @@ function genSnippet(entry: DiffEntry, side: "a" | "b"): string {
   const seg = entry[side];
   if (!seg) return "";
   const lines = side === "a" ? props.genLinesA : props.genLinesB;
-  return extractSnippet(lines, seg.generatedLine, seg.generatedColumn);
+  return extractGeneratedSnippet(lines, seg.generatedLine, seg.generatedColumn);
 }
 
 function origPos(entry: DiffEntry, side: "a" | "b"): string {
@@ -67,7 +67,7 @@ function origCode(entry: DiffEntry, side: "a" | "b"): string {
   if (!seg) return "";
   const allLines = side === "a" ? props.origLinesA : props.origLinesB;
   const sourceLines = allLines[seg.sourceIndex] ?? [];
-  return extractSnippet(sourceLines, seg.originalLine, seg.originalColumn);
+  return extractOriginalSnippet(sourceLines, seg.originalLine, seg.originalColumn);
 }
 
 function getContextLines(

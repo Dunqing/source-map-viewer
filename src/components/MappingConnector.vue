@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { ref, watch, onUnmounted } from "vue";
 import { useSourceMapStore } from "../stores/sourceMap";
-import { clampOriginalPosition } from "../core/mapper";
+import {
+  clampOriginalPosition,
+  getRenderedColumnRange,
+  type RenderedColumnRange,
+} from "../core/mapper";
 import type { MappingSegment } from "../core/types";
 
 type Panel = {
@@ -21,66 +25,73 @@ const store = useSourceMapStore();
 
 const curveColor = "var(--connector-curve)";
 
-const endColCache = new WeakMap<MappingSegment, { orig: number; gen: number }>();
+interface SegmentDisplayColumns {
+  orig: RenderedColumnRange;
+  gen: RenderedColumnRange;
+}
 
-function getSegmentEndColumns(seg: MappingSegment): { orig: number; gen: number } {
-  const cached = endColCache.get(seg);
+const displayColCache = new WeakMap<MappingSegment, SegmentDisplayColumns>();
+
+function getDisplayRange(
+  columns: number[],
+  index: number,
+  lineText: string,
+  fallbackColumn: number,
+): RenderedColumnRange {
+  return getRenderedColumnRange(
+    index >= 0 ? columns : [fallbackColumn],
+    Math.max(index, 0),
+    lineText,
+    {
+      skipIndent: true,
+    },
+  );
+}
+
+function getSegmentDisplayColumns(
+  seg: MappingSegment,
+  sourceLines: string[],
+  genLines: string[],
+): SegmentDisplayColumns {
+  const cached = displayColCache.get(seg);
   if (cached) return cached;
 
-  function findNext(side: "original" | "generated"): number {
-    const col = side === "generated" ? seg.generatedColumn : seg.originalColumn;
-    const line = side === "generated" ? seg.generatedLine : seg.originalLine;
-    const segments =
-      side === "generated"
-        ? store.mappingIndex
-        : (store.inverseMappingIndex.get(seg.sourceIndex) ?? []);
+  const clamped = clampOriginalPosition(seg.originalLine, seg.originalColumn, sourceLines);
+  const origLineText = sourceLines[clamped.line] ?? "";
+  const genLineText = genLines[seg.generatedLine] ?? "";
 
-    // Binary search for segment at (line, col)
-    let lo = 0,
-      hi = segments.length - 1;
-    let idx = -1;
-    while (lo <= hi) {
-      const mid = (lo + hi) >>> 1;
-      const mLine = side === "generated" ? segments[mid].generatedLine : segments[mid].originalLine;
-      const mCol =
-        side === "generated" ? segments[mid].generatedColumn : segments[mid].originalColumn;
-      if (mLine < line || (mLine === line && mCol < col)) lo = mid + 1;
-      else if (mLine > line || (mLine === line && mCol > col)) hi = mid - 1;
-      else {
-        idx = mid;
-        break;
-      }
+  const originalColumns: number[] = [];
+  let originalIndex = -1;
+  for (const candidate of store.inverseMappingIndex.get(seg.sourceIndex) ?? []) {
+    const candidateClamped = clampOriginalPosition(
+      candidate.originalLine,
+      candidate.originalColumn,
+      sourceLines,
+    );
+    if (candidateClamped.line !== clamped.line) continue;
+    if (candidate === seg) {
+      originalIndex = originalColumns.length;
     }
-
-    if (idx >= 0) {
-      // Skip past any duplicate segments at the same position
-      let nextIdx = idx + 1;
-      while (nextIdx < segments.length) {
-        const next = segments[nextIdx];
-        const nextLine = side === "generated" ? next.generatedLine : next.originalLine;
-        const nextCol = side === "generated" ? next.generatedColumn : next.originalColumn;
-        if (nextLine !== line || nextCol !== col) {
-          if (nextLine === line) return nextCol;
-          break;
-        }
-        nextIdx++;
-      }
-    }
-
-    // Fallback: end of line
-    const code =
-      side === "generated"
-        ? store.generatedCode
-        : store.parsedData?.sourcesContent[seg.sourceIndex];
-    if (code) {
-      const lines = code.split("\n");
-      return lines[line]?.length ?? col + 1;
-    }
-    return col + 1;
+    originalColumns.push(candidateClamped.column);
   }
 
-  const result = { orig: findNext("original"), gen: findNext("generated") };
-  endColCache.set(seg, result);
+  const generatedColumns: number[] = [];
+  let generatedIndex = -1;
+  for (const candidate of store.mappingIndex) {
+    if (candidate.generatedLine > seg.generatedLine) break;
+    if (candidate.generatedLine !== seg.generatedLine) continue;
+    if (candidate === seg) {
+      generatedIndex = generatedColumns.length;
+    }
+    generatedColumns.push(candidate.generatedColumn);
+  }
+
+  const result = {
+    orig: getDisplayRange(originalColumns, originalIndex, origLineText, clamped.column),
+    gen: getDisplayRange(generatedColumns, generatedIndex, genLineText, seg.generatedColumn),
+  };
+
+  displayColCache.set(seg, result);
   return result;
 }
 
@@ -92,6 +103,7 @@ interface ConnectorData {
 const connector = ref<ConnectorData | null>(null);
 const curvePath = ref("");
 const isClamped = ref(false);
+const isSplitToken = ref(false);
 let rafId = 0;
 let prevConnector: ConnectorData | null = null;
 
@@ -107,14 +119,6 @@ function getGenLines(): string[] {
   return cachedGenLines;
 }
 
-function skipIndent(lines: string[], line: number, col: number): number {
-  const lineText = lines[line];
-  if (!lineText) return col;
-  const firstCode = lineText.search(/\S/);
-  if (firstCode < 0) return col;
-  return Math.max(col, firstCode);
-}
-
 function calcConnector(seg: MappingSegment): ConnectorData | null {
   if (!props.originalPanel || !props.generatedPanel) return null;
 
@@ -122,21 +126,20 @@ function calcConnector(seg: MappingSegment): ConnectorData | null {
   const sourceLines = sourceContent ? sourceContent.split("\n") : [];
   const genLines = getGenLines();
   const clamped = clampOriginalPosition(seg.originalLine, seg.originalColumn, sourceLines);
+  const displayCols = getSegmentDisplayColumns(seg, sourceLines, genLines);
 
-  const origCol = skipIndent(sourceLines, clamped.line, clamped.column);
-  const genCol = skipIndent(genLines, seg.generatedLine, seg.generatedColumn);
-
-  const origPos = props.originalPanel.getViewportPosition(clamped.line, origCol);
-  const genPos = props.generatedPanel.getViewportPosition(seg.generatedLine, genCol);
+  const origPos = props.originalPanel.getViewportPosition(clamped.line, displayCols.orig.start);
+  const genPos = props.generatedPanel.getViewportPosition(seg.generatedLine, displayCols.gen.start);
   if (!origPos || !genPos) return null;
 
   const origCharW = props.originalPanel.getCharWidth();
   const genCharW = props.generatedPanel.getCharWidth();
-  const endCols = getSegmentEndColumns(seg);
 
-  const origEndCol = Math.min(endCols.orig, sourceLines[clamped.line]?.length ?? endCols.orig);
-  const origEndPos = props.originalPanel.getViewportPosition(clamped.line, origEndCol);
-  const genEndPos = props.generatedPanel.getViewportPosition(seg.generatedLine, endCols.gen);
+  const origEndPos = props.originalPanel.getViewportPosition(clamped.line, displayCols.orig.end);
+  const genEndPos = props.generatedPanel.getViewportPosition(
+    seg.generatedLine,
+    displayCols.gen.end,
+  );
   const origWidth = Math.max(origCharW, origEndPos ? origEndPos.x - origPos.x : origCharW);
   const genWidth = Math.max(genCharW, genEndPos ? genEndPos.x - genPos.x : genCharW);
 
@@ -211,9 +214,11 @@ function updateLoop() {
     connector.value = null;
     curvePath.value = "";
     isClamped.value = false;
+    isSplitToken.value = false;
     return;
   }
   isClamped.value = store.clampedSegmentSet.has(seg);
+  isSplitToken.value = store.splitTokenSegmentSet.has(seg);
   const c = calcConnector(seg);
   if (c) {
     const prev = prevConnector;
@@ -252,6 +257,7 @@ watch(
       connector.value = null;
       curvePath.value = "";
       isClamped.value = false;
+      isSplitToken.value = false;
     }
   },
 );
@@ -277,11 +283,17 @@ onUnmounted(() => cancelAnimationFrame(rafId));
         v-if="connector"
         :d="curvePath"
         fill="none"
-        :stroke="isClamped ? 'var(--connector-clamped, #ef4444)' : curveColor"
+        :stroke="
+          isClamped
+            ? 'var(--connector-clamped, #ef4444)'
+            : isSplitToken
+              ? 'var(--connector-suspicious, #f59e0b)'
+              : curveColor
+        "
         :stroke-width="isClamped ? 1 : 1.5"
         stroke-linecap="round"
         stroke-linejoin="round"
-        :stroke-dasharray="isClamped ? '4 3' : 'none'"
+        :stroke-dasharray="isClamped || isSplitToken ? '4 3' : 'none'"
         style="transition: d 150ms ease-out"
       />
     </svg>

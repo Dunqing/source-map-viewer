@@ -7,7 +7,9 @@ export function useAiDebugPrompt() {
   const visualizationUrl = ref("");
 
   onMounted(() => {
-    visualizationUrl.value = window.location.href;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("seg");
+    visualizationUrl.value = url.toString();
   });
 
   const prompt = computed(() => {
@@ -23,6 +25,7 @@ export function useAiDebugPrompt() {
       mappingIndex: store.mappingIndex,
       diagnostics: store.diagnostics,
       badSegmentSet: store.badSegmentSet,
+      splitTokenSegmentSet: store.splitTokenSegmentSet,
       qualityWarnings,
       coveragePercent,
       visualizationUrl: visualizationUrl.value,

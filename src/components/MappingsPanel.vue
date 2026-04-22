@@ -3,6 +3,7 @@ import { computed, ref, nextTick } from "vue";
 import IconCopy from "~icons/carbon/copy";
 import IconCheckmark from "~icons/carbon/checkmark";
 import { useSourceMapStore } from "../stores/sourceMap";
+import { extractGeneratedSnippet, extractOriginalSnippet } from "../core/snippets";
 
 const store = useSourceMapStore();
 const filter = ref("");
@@ -21,24 +22,30 @@ const origLinesMap = computed(() => {
   return map;
 });
 
-function getSnippet(lines: string[], line: number, col: number, maxLen = 30): string {
-  const text = lines[line] ?? "";
-  const snippet = text.slice(col, col + maxLen);
-  return snippet.length >= maxLen ? snippet + "..." : snippet;
-}
-
 const mappings = computed(() => {
   if (!store.parsedData) return [];
 
   const q = filter.value.toLowerCase();
+  const snippetOptions = { length: 30, appendEllipsis: true } as const;
   return store.mappingIndex
     .map((seg, i) => {
       const source = store.parsedData!.sources[seg.sourceIndex] ?? "?";
       const name = seg.nameIndex !== null ? store.parsedData!.names[seg.nameIndex] : null;
-      const genSnippet = getSnippet(genLines.value, seg.generatedLine, seg.generatedColumn);
+      const genSnippet = extractGeneratedSnippet(
+        genLines.value,
+        seg.generatedLine,
+        seg.generatedColumn,
+        snippetOptions,
+      );
       const origLines = origLinesMap.value.get(seg.sourceIndex) ?? [];
-      const origSnippet = getSnippet(origLines, seg.originalLine, seg.originalColumn);
+      const origSnippet = extractOriginalSnippet(
+        origLines,
+        seg.originalLine,
+        seg.originalColumn,
+        snippetOptions,
+      );
       const isBad = store.badSegmentSet.has(seg);
+      const isSuspicious = store.splitTokenSegmentSet.has(seg);
       return {
         i,
         seg,
@@ -51,6 +58,7 @@ const mappings = computed(() => {
         origSnippet,
         name,
         isBad,
+        isSuspicious,
         isHovered: seg === store.hoveredSegment,
       };
     })
@@ -62,6 +70,7 @@ const mappings = computed(() => {
         m.source.toLowerCase().includes(q) ||
         m.genSnippet.toLowerCase().includes(q) ||
         m.origSnippet.toLowerCase().includes(q) ||
+        (m.isSuspicious && "suspicious split-token identifier".includes(q)) ||
         (m.name?.toLowerCase().includes(q) ?? false)
       );
     });
@@ -82,16 +91,18 @@ const summary = computed(() => {
   const sources = store.parsedData.sources.length;
   const names = store.parsedData.names.length;
   const bad = store.diagnostics.length;
-  return `${total} mappings, ${sources} source${sources !== 1 ? "s" : ""}, ${names} name${names !== 1 ? "s" : ""}${bad > 0 ? `, ${bad} bad` : ""}`;
+  const suspicious = store.splitTokenSegmentSet.size;
+  return `${total} mappings, ${sources} source${sources !== 1 ? "s" : ""}, ${names} name${names !== 1 ? "s" : ""}${bad > 0 ? `, ${bad} bad` : ""}${suspicious > 0 ? `, ${suspicious} suspicious` : ""}`;
 });
 
 const copied = ref(false);
 
 function copyMappings() {
-  const header = `| Orig | Original code | → | Gen | Generated code | Source |${store.parsedData?.names?.length ? " Name |" : ""}`;
-  const divider = `|------|--------------|---|-----|---------------|--------|${store.parsedData?.names?.length ? "------|" : ""}`;
+  const header = `| Orig | Original code | → | Gen | Generated code | Source | Flag |${store.parsedData?.names?.length ? " Name |" : ""}`;
+  const divider = `|------|--------------|---|-----|---------------|--------|------|${store.parsedData?.names?.length ? "------|" : ""}`;
   const rows = mappings.value.map((m) => {
-    const base = `| ${m.origLine}:${m.origCol} | \`${m.origSnippet}\` | → | ${m.genLine}:${m.genCol} | \`${m.genSnippet}\` | ${m.source} |`;
+    const flag = m.isBad ? "⚠ invalid" : m.isSuspicious ? "⚡ split-token" : "";
+    const base = `| ${m.origLine}:${m.origCol} | \`${m.origSnippet}\` | → | ${m.genLine}:${m.genCol} | \`${m.genSnippet}\` | ${m.source} | ${flag} |`;
     return store.parsedData?.names?.length ? `${base} ${m.name ?? ""} |` : base;
   });
 
@@ -137,6 +148,7 @@ function copyMappings() {
             <th class="px-2 py-1 w-20">Gen</th>
             <th class="px-2 py-1">Generated code</th>
             <th class="px-2 py-1 w-24">Source</th>
+            <th class="px-2 py-1 w-10 text-center">Flag</th>
             <th v-if="store.parsedData?.names?.length" class="px-2 py-1 w-20">Name</th>
           </tr>
         </thead>
@@ -148,7 +160,9 @@ function copyMappings() {
             :class="[
               m.isHovered ? 'bg-yellow-50 dark:bg-yellow-900/20' : '',
               m.isBad && !m.isHovered ? 'bg-red-50 dark:bg-red-900/10' : '',
+              m.isSuspicious && !m.isBad && !m.isHovered ? 'suspicious-row' : '',
             ]"
+            :title="m.isSuspicious ? 'Suspicious: mapping cuts through an identifier' : undefined"
             :data-mapping-hovered="m.isHovered || undefined"
             @mouseenter="store.setHoveredSegment(m.seg)"
             @mouseleave="store.setHoveredSegment(null)"
@@ -169,6 +183,18 @@ function copyMappings() {
             </td>
             <td class="px-2 py-0.5 text-fg-muted truncate">{{ m.source }}</td>
             <td
+              class="px-2 py-0.5 whitespace-nowrap text-center"
+              :class="
+                m.isBad
+                  ? 'text-red-600 dark:text-red-400'
+                  : m.isSuspicious
+                    ? 'suspicious-flag'
+                    : 'text-fg-muted'
+              "
+            >
+              {{ m.isBad ? "⚠" : m.isSuspicious ? "⚡" : "" }}
+            </td>
+            <td
               v-if="store.parsedData?.names?.length"
               class="px-2 py-0.5 text-purple-600 dark:text-purple-400"
             >
@@ -180,3 +206,13 @@ function copyMappings() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.suspicious-row {
+  background: var(--connector-suspicious-bg);
+}
+
+.suspicious-flag {
+  color: var(--connector-suspicious);
+}
+</style>

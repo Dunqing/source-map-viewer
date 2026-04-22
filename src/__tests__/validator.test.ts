@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vite-plus/test";
-import { validateMappings } from "../core/validator";
+import { buildInverseMappingIndex, buildMappingIndex } from "../core/mapper";
+import { findTokenSplitSegments, validateMappings } from "../core/validator";
 import type { SourceMapData } from "../core/types";
 
 function makeSourceMap(overrides: Partial<SourceMapData> = {}): SourceMapData {
@@ -231,5 +232,72 @@ describe("validateMappings", () => {
     const diagnostics = validateMappings(data);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0].type).toBe("invalid-source");
+  });
+});
+
+describe("findTokenSplitSegments", () => {
+  it("flags boundaries that split an identifier on the generated side", () => {
+    const first = {
+      generatedLine: 0,
+      generatedColumn: 1,
+      originalLine: 0,
+      originalColumn: 2,
+      sourceIndex: 0,
+      nameIndex: null,
+    };
+    const second = {
+      generatedLine: 0,
+      generatedColumn: 16,
+      originalLine: 0,
+      originalColumn: 25,
+      sourceIndex: 0,
+      nameIndex: null,
+    };
+    const data = makeSourceMap({
+      sourcesContent: ["  toFahrenheit(): number {"],
+      mappings: [first, second],
+    });
+
+    const result = findTokenSplitSegments(
+      data,
+      "        toFahrenheit() {",
+      buildMappingIndex(data.mappings),
+      buildInverseMappingIndex(data.mappings),
+    );
+
+    expect(result.has(first)).toBe(true);
+    expect(result.has(second)).toBe(true);
+  });
+
+  it("ignores boundaries that fall between tokens", () => {
+    const first = {
+      generatedLine: 0,
+      generatedColumn: 0,
+      originalLine: 0,
+      originalColumn: 0,
+      sourceIndex: 0,
+      nameIndex: null,
+    };
+    const second = {
+      generatedLine: 0,
+      generatedColumn: 8,
+      originalLine: 0,
+      originalColumn: 8,
+      sourceIndex: 0,
+      nameIndex: null,
+    };
+    const data = makeSourceMap({
+      sourcesContent: ["return x;"],
+      mappings: [first, second],
+    });
+
+    const result = findTokenSplitSegments(
+      data,
+      "return x;",
+      buildMappingIndex(data.mappings),
+      buildInverseMappingIndex(data.mappings),
+    );
+
+    expect(result.size).toBe(0);
   });
 });

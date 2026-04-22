@@ -1,8 +1,8 @@
 import { resolveFile } from "./resolve.js";
 import { upload } from "./upload.js";
 import { parseSourceMap } from "@core/parser.js";
-import { buildMappingIndex } from "@core/mapper.js";
-import { validateMappings } from "@core/validator.js";
+import { buildInverseMappingIndex, buildMappingIndex } from "@core/mapper.js";
+import { findTokenSplitSegments, validateMappings } from "@core/validator.js";
 import { generateDebugPrompt, analyzeQuality } from "@core/prompt.js";
 import { calculateStats } from "@core/stats.js";
 import { diffMappings } from "@core/diff.js";
@@ -223,8 +223,15 @@ async function main() {
   if (aiMode) {
     const parsedData = parseSourceMap(sourceMapJson);
     const mappingIndex = buildMappingIndex(parsedData.mappings);
+    const inverseMappingIndex = buildInverseMappingIndex(parsedData.mappings);
     const diagnostics = validateMappings(parsedData);
     const badSegmentSet = new Set(diagnostics.map((d) => d.segment));
+    const splitTokenSegmentSet = findTokenSplitSegments(
+      parsedData,
+      generatedCode,
+      mappingIndex,
+      inverseMappingIndex,
+    );
     const stats = calculateStats(parsedData, generatedCode, diagnostics, mappingIndex);
     const qualityWarnings = analyzeQuality(parsedData, generatedCode, stats.coveragePercent);
     const markdown = generateDebugPrompt({
@@ -234,6 +241,7 @@ async function main() {
       mappingIndex,
       diagnostics,
       badSegmentSet,
+      splitTokenSegmentSet,
       qualityWarnings,
       coveragePercent: stats.coveragePercent,
     });

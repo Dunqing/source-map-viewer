@@ -5,6 +5,7 @@ import {
   findMappingForGenerated,
   findMappingsForOriginal,
   clampOriginalPosition,
+  getRenderedColumnRange,
 } from "../core/mapper";
 import type { MappingSegment } from "../core/types";
 
@@ -164,5 +165,33 @@ describe("clampOriginalPosition", () => {
     expect(clampOriginalPosition(2, 0, trailingNewline)).toEqual({ line: 2, column: 0 });
     // line 2 col 1 clamps to 0 since the line is empty
     expect(clampOriginalPosition(2, 1, trailingNewline)).toEqual({ line: 2, column: 0 });
+  });
+});
+
+describe("getRenderedColumnRange", () => {
+  it("skips collapsed boundaries after indentation is trimmed", () => {
+    const lineText = "                        return original.call(this, value);";
+    const columns = [0, 10, 19, 24, 30, 36];
+
+    expect(getRenderedColumnRange(columns, 0, lineText, { skipIndent: true })).toEqual({
+      start: 24,
+      end: 30,
+    });
+    expect(getRenderedColumnRange(columns, 1, lineText, { skipIndent: true })).toEqual({
+      start: 24,
+      end: 30,
+    });
+    expect(getRenderedColumnRange(columns, 3, lineText, { skipIndent: true })).toEqual({
+      start: 24,
+      end: 30,
+    });
+  });
+
+  it("keeps the next distinct raw boundary when indentation trimming is disabled", () => {
+    const lineText = "  return 42;";
+    const columns = [0, 2, 9];
+
+    expect(getRenderedColumnRange(columns, 0, lineText)).toEqual({ start: 0, end: 2 });
+    expect(getRenderedColumnRange(columns, 1, lineText)).toEqual({ start: 2, end: 9 });
   });
 });

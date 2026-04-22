@@ -3,7 +3,7 @@ import { computed, ref, nextTick, onMounted, onUnmounted } from "vue";
 import { useVirtualScroll } from "../composables/useVirtualScroll";
 import { useHighlighter } from "../composables/useHighlighter";
 import { useSourceMapStore } from "../stores/sourceMap";
-import { clampOriginalPosition } from "../core/mapper";
+import { clampOriginalPosition, getRenderedColumnRange } from "../core/mapper";
 import {
   SEGMENT_COLOR_COUNT,
   LINE_HEIGHT,
@@ -184,35 +184,24 @@ const visibleLineSpans = computed<RenderSpan[][]>(() => {
       continue;
     }
 
+    const mappingColumns =
+      props.side === "generated"
+        ? mappingsOnLine.map((seg) => seg.generatedColumn)
+        : mappingsOnLine.map(
+            (seg) => clampedPositionCache.value.get(seg)?.column ?? seg.originalColumn,
+          );
+
     // Build per-character mapping assignment
     const charMapping: (MappingSegment | null)[] = Array.from<MappingSegment | null>(
       { length: lineText.length },
       () => null,
     );
-    // Index of first non-whitespace char — used to avoid highlighting indentation
-    const firstCode = lineText.search(/\S/);
 
     for (let i = 0; i < mappingsOnLine.length; i++) {
       const seg = mappingsOnLine[i];
-      let startCol: number;
-      let endCol: number;
-
-      if (props.side === "generated") {
-        startCol = seg.generatedColumn;
-        endCol =
-          i + 1 < mappingsOnLine.length ? mappingsOnLine[i + 1].generatedColumn : lineText.length;
-        // Don't highlight leading whitespace
-        if (firstCode > 0 && startCol < firstCode) startCol = firstCode;
-      } else {
-        const clamped = clampedPositionCache.value.get(seg);
-        startCol = clamped ? clamped.column : seg.originalColumn;
-        if (i + 1 < mappingsOnLine.length) {
-          const nextClamped = clampedPositionCache.value.get(mappingsOnLine[i + 1]);
-          endCol = nextClamped ? nextClamped.column : mappingsOnLine[i + 1].originalColumn;
-        } else {
-          endCol = lineText.length;
-        }
-      }
+      const { start: startCol, end: endCol } = getRenderedColumnRange(mappingColumns, i, lineText, {
+        skipIndent: props.side === "generated",
+      });
 
       for (let c = startCol; c < endCol && c < lineText.length; c++) {
         charMapping[c] = seg;

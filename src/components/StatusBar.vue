@@ -14,8 +14,11 @@ const statusText = computed(() => {
 
   const source = store.parsedData?.sources[seg.sourceIndex] ?? "unknown";
   const name = seg.nameIndex !== null ? store.parsedData?.names[seg.nameIndex] : null;
+  const note = store.splitTokenSegmentSet.has(seg)
+    ? " · suspicious: mapping cuts through an identifier"
+    : "";
 
-  return `${source} ${seg.originalLine + 1}:${seg.originalColumn}${name ? ` (${name})` : ""} → Generated ${seg.generatedLine + 1}:${seg.generatedColumn}`;
+  return `${source} ${seg.originalLine + 1}:${seg.originalColumn}${name ? ` (${name})` : ""} → Generated ${seg.generatedLine + 1}:${seg.generatedColumn}${note}`;
 });
 </script>
 

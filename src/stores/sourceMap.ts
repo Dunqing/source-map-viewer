@@ -9,7 +9,7 @@ import type {
 } from "../core/types";
 import { parseSourceMap } from "../core/parser";
 import { buildInverseMappingIndex, buildMappingIndex, clampOriginalPosition } from "../core/mapper";
-import { validateMappings } from "../core/validator";
+import { findTokenSplitSegments, validateMappings } from "../core/validator";
 import { calculateStats } from "../core/stats";
 
 function createSourceMapStore() {
@@ -39,6 +39,18 @@ function createSourceMapStore() {
   const badSegmentSet = computed(
     () => new Set<MappingSegment>(diagnostics.value.map((d) => d.segment)),
   );
+
+  /** Segments whose mapping boundaries split an identifier on either side. */
+  const splitTokenSegmentSet = computed(() => {
+    const data = parsedData.value;
+    if (!data) return new Set<MappingSegment>();
+    return findTokenSplitSegments(
+      data,
+      generatedCode.value,
+      mappingIndex.value,
+      inverseMappingIndex.value,
+    );
+  });
 
   /** Segments whose original position was clamped (out-of-bounds in source content). */
   const clampedSegmentSet = computed(() => {
@@ -71,8 +83,9 @@ function createSourceMapStore() {
       inverseMappingIndex.value = buildInverseMappingIndex(data.mappings);
       diagnostics.value = validateMappings(data);
       stats.value = calculateStats(data, code, diagnostics.value, mappingIndex.value);
-      // Warm clampedSegmentSet eagerly so the first hover doesn't stall
+      // Warm hover-dependent sets eagerly so the first hover doesn't stall
       void clampedSegmentSet.value;
+      void splitTokenSegmentSet.value;
       activeSourceIndex.value = 0;
       hoveredSegment.value = null;
     } catch (e) {
@@ -126,6 +139,7 @@ function createSourceMapStore() {
     activeSourceName,
     sourceCount,
     badSegmentSet,
+    splitTokenSegmentSet,
     clampedSegmentSet,
     loadSourceMap,
     setActiveSource,

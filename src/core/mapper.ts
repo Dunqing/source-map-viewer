@@ -1,5 +1,10 @@
 import type { InverseMappingIndex, MappingIndex, MappingSegment } from "./types";
 
+export interface RenderedColumnRange {
+  start: number;
+  end: number;
+}
+
 /**
  * Clamp an original position to valid bounds within source content,
  * matching Chrome DevTools behavior.
@@ -22,6 +27,39 @@ export function clampOriginalPosition(
   const column = Math.max(0, Math.min(lineContent.length, originalColumn));
 
   return { line, column };
+}
+
+function clampDisplayColumn(column: number, lineLength: number): number {
+  return Math.max(0, Math.min(lineLength, column));
+}
+
+export function skipLeadingWhitespace(lineText: string, column: number): number {
+  const clamped = clampDisplayColumn(column, lineText.length);
+  const firstCode = lineText.search(/\S/);
+  if (firstCode < 0) return clamped;
+  return Math.max(clamped, firstCode);
+}
+
+export function getRenderedColumnRange(
+  columns: readonly number[],
+  index: number,
+  lineText: string,
+  { skipIndent = false }: { skipIndent?: boolean } = {},
+): RenderedColumnRange {
+  const normalize = skipIndent
+    ? (column: number) => skipLeadingWhitespace(lineText, column)
+    : (column: number) => clampDisplayColumn(column, lineText.length);
+
+  const start = normalize(columns[index] ?? 0);
+
+  for (let i = index + 1; i < columns.length; i++) {
+    const next = normalize(columns[i] ?? 0);
+    if (next > start) {
+      return { start, end: next };
+    }
+  }
+
+  return { start, end: lineText.length };
 }
 
 export function buildMappingIndex(segments: MappingSegment[]): MappingIndex {
