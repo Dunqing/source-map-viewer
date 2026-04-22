@@ -91,7 +91,11 @@ async function handleUrl() {
     error.value = null;
     loading.value = true;
     const result = await loadFromUrl(urlInput.value);
-    const label = new URL(urlInput.value).pathname.split("/").pop() || urlInput.value;
+    const parsedUrl = new URL(urlInput.value);
+    const label =
+      parsedUrl.protocol === "data:"
+        ? "data:application/json"
+        : parsedUrl.pathname.split("/").pop() || urlInput.value;
     await navigateWithData(result.generatedCode, result.sourceMapJson, label);
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to fetch URL";
@@ -219,7 +223,7 @@ function formatTimeAgo(timestamp: number): string {
         <textarea
           v-model="pasteContent"
           class="w-full h-40 rounded-lg border border-edge bg-muted p-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Paste generated code with an inline sourceMappingURL, or raw source map JSON..."
+          placeholder="Paste generated code with an inline sourceMappingURL, raw source map JSON, or a data:application/json... URL..."
         />
         <button
           class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition disabled:opacity-50"
@@ -235,7 +239,7 @@ function formatTimeAgo(timestamp: number): string {
         <input
           v-model="urlInput"
           class="w-full rounded-lg border border-edge bg-muted px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="https://cdn.example.com/bundle.min.js or .map"
+          placeholder="https://cdn.example.com/bundle.min.js, .map, or data:application/json..."
           @keydown.enter="handleUrl"
         />
         <button

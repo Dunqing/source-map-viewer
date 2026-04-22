@@ -54,9 +54,35 @@ export function parseSourceMap(jsonString: string): SourceMapData {
 }
 
 const INLINE_SOURCE_MAP_RE =
-  /(?:\/\/[#@]\s*sourceMappingURL=|\/\*[#@]\s*sourceMappingURL=)(data:application\/json;base64,([A-Za-z0-9+/=]+))\s*\*?\/?\s*$/m;
+  /(?:\/\/[#@]\s*sourceMappingURL=|\/\*[#@]\s*sourceMappingURL=)(data:[^\s*]+)\s*\*?\/?\s*$/m;
 const SOURCE_MAP_COMMENT_RE =
   /(?:\/\/[#@]\s*sourceMappingURL=|\/\*[#@]\s*sourceMappingURL=).*?(?:\*\/)?[\r\n]*$/m;
+
+export function decodeSourceMapDataUrl(input: string): string | null {
+  const trimmed = input.trim();
+  if (trimmed.slice(0, 5).toLowerCase() !== "data:") return null;
+
+  const commaIndex = trimmed.indexOf(",");
+  if (commaIndex === -1) return null;
+
+  const metadata = trimmed.slice(5, commaIndex);
+  const payload = trimmed.slice(commaIndex + 1);
+  const parts = metadata
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const mimeType = parts.shift()?.toLowerCase() ?? "";
+  if (mimeType !== "application/json") return null;
+
+  const isBase64 = parts.some((part) => part.toLowerCase() === "base64");
+
+  try {
+    const decodedPayload = decodeURIComponent(payload);
+    return isBase64 ? atob(decodedPayload.replace(/\s+/g, "")) : decodedPayload;
+  } catch {
+    return null;
+  }
+}
 
 export function extractInlineSourceMap(
   code: string,
@@ -64,8 +90,8 @@ export function extractInlineSourceMap(
   const match = code.match(INLINE_SOURCE_MAP_RE);
   if (!match) return null;
 
-  const base64Data = match[2];
-  const sourceMapJson = atob(base64Data);
+  const sourceMapJson = decodeSourceMapDataUrl(match[1]);
+  if (sourceMapJson == null) return null;
   const cleanCode = code.replace(SOURCE_MAP_COMMENT_RE, "");
 
   return { code: cleanCode, sourceMapJson };

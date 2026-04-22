@@ -39,6 +39,19 @@ describe("resolveFile", () => {
     expect(result.label).toBe("inline.js");
   });
 
+  it("resolves inline sourceMappingURL with charset metadata", () => {
+    const base64Map = Buffer.from(SIMPLE_MAP).toString("base64");
+    const code = `var a=1;\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${base64Map}`;
+    const filePath = join(FIXTURE_DIR, "inline-charset.js");
+    writeFileSync(filePath, code);
+
+    const result = resolveFile(filePath);
+
+    expect(result.sourceMapJson).toBe(SIMPLE_MAP);
+    expect(result.generatedCode).not.toContain("sourceMappingURL");
+    expect(result.generatedCode).toContain("var a=1;");
+  });
+
   it("resolves external .map file via sourceMappingURL comment", () => {
     const code = `var a=1;\n//# sourceMappingURL=bundle.js.map`;
     const filePath = join(FIXTURE_DIR, "bundle.js");

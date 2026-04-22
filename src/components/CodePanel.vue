@@ -44,6 +44,14 @@ const { tokenizeLines, detectLanguage, loading: highlighterLoading } = useHighli
 
 const containerRef = ref<HTMLElement | null>(null);
 const containerHeight = ref(400);
+const emptyStateMessage = computed(() => {
+  if (!store.parsedData || props.side !== "generated" || props.code.length > 0) return null;
+  return {
+    title: "No generated code to display",
+    detail:
+      "This looks like a standalone source map. Load the built file too to inspect emitted output.",
+  };
+});
 
 const lines = computed(() => props.code.split("\n"));
 const totalLines = computed(() => lines.value.length);
@@ -418,54 +426,65 @@ defineExpose({
     @mouseleave="handleMouseLeave"
     @click="handleClick"
   >
-    <button
-      class="absolute top-2 right-4 z-10 p-1.5 rounded bg-muted hover:bg-emphasis text-fg-muted hover:text-fg transition opacity-0 group-hover:opacity-100"
-      title="Copy code"
-      @click.stop="copyCode"
+    <div
+      v-if="emptyStateMessage"
+      class="flex h-full items-center justify-center px-8 text-center text-sm"
     >
-      <IconCheckmark v-if="copied" class="w-4 h-4 text-green-500" />
-      <IconCopy v-else class="w-4 h-4" />
-    </button>
-    <div :style="{ height: `${totalHeight}px`, position: 'relative' }">
-      <div :style="{ transform: `translateY(${offsetY}px)` }">
-        <div
-          v-for="(_line, i) in endLine - startLine"
-          :key="startLine + i"
-          :data-line="startLine + i"
-          class="flex items-center"
-          :style="{ height: `${LINE_HEIGHT}px`, lineHeight: `${LINE_HEIGHT}px` }"
-          :class="[searchMatchLines.has(startLine + i) ? 'search-match-line' : '']"
-        >
-          <!-- Line number -->
-          <span
-            class="inline-block w-12 text-right pr-3 text-fg-muted select-none shrink-0 text-xs"
-          >
-            {{ startLine + i + 1 }}
-          </span>
-          <!-- Code with syntax highlighting + mapping segment colors -->
-          <span class="flex-1 whitespace-pre">
-            <span
-              v-for="(span, j) in getLineSpans(i)"
-              :key="j"
-              :style="{
-                color: span.textColor,
-                backgroundColor: getSpanBgColor(span),
-              }"
-              :class="{
-                'cursor-pointer rounded-sm': span.segment !== null,
-                'unmapped-original':
-                  !highlighterLoading && span.segment === null && side === 'original',
-                'unmapped-generated':
-                  !highlighterLoading && span.segment === null && side === 'generated',
-                'bad-mapping': span.isBad,
-              }"
-              @mouseenter="handleSegmentHover(span.segment)"
-              >{{ span.text }}</span
-            >
-          </span>
-        </div>
+      <div class="max-w-md space-y-2">
+        <p class="font-medium text-fg">{{ emptyStateMessage.title }}</p>
+        <p class="text-fg-muted">{{ emptyStateMessage.detail }}</p>
       </div>
     </div>
+    <template v-else>
+      <button
+        class="absolute top-2 right-4 z-10 p-1.5 rounded bg-muted hover:bg-emphasis text-fg-muted hover:text-fg transition opacity-0 group-hover:opacity-100"
+        title="Copy code"
+        @click.stop="copyCode"
+      >
+        <IconCheckmark v-if="copied" class="w-4 h-4 text-green-500" />
+        <IconCopy v-else class="w-4 h-4" />
+      </button>
+      <div :style="{ height: `${totalHeight}px`, position: 'relative' }">
+        <div :style="{ transform: `translateY(${offsetY}px)` }">
+          <div
+            v-for="(_line, i) in endLine - startLine"
+            :key="startLine + i"
+            :data-line="startLine + i"
+            class="flex items-center"
+            :style="{ height: `${LINE_HEIGHT}px`, lineHeight: `${LINE_HEIGHT}px` }"
+            :class="[searchMatchLines.has(startLine + i) ? 'search-match-line' : '']"
+          >
+            <!-- Line number -->
+            <span
+              class="inline-block w-12 text-right pr-3 text-fg-muted select-none shrink-0 text-xs"
+            >
+              {{ startLine + i + 1 }}
+            </span>
+            <!-- Code with syntax highlighting + mapping segment colors -->
+            <span class="flex-1 whitespace-pre">
+              <span
+                v-for="(span, j) in getLineSpans(i)"
+                :key="j"
+                :style="{
+                  color: span.textColor,
+                  backgroundColor: getSpanBgColor(span),
+                }"
+                :class="{
+                  'cursor-pointer rounded-sm': span.segment !== null,
+                  'unmapped-original':
+                    !highlighterLoading && span.segment === null && side === 'original',
+                  'unmapped-generated':
+                    !highlighterLoading && span.segment === null && side === 'generated',
+                  'bad-mapping': span.isBad,
+                }"
+                @mouseenter="handleSegmentHover(span.segment)"
+                >{{ span.text }}</span
+              >
+            </span>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 

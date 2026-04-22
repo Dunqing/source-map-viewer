@@ -1,4 +1,4 @@
-import { extractInlineSourceMap } from "../core/parser";
+import { decodeSourceMapDataUrl, extractInlineSourceMap } from "../core/parser";
 
 export interface LoadedFiles {
   generatedCode: string;
@@ -6,6 +6,33 @@ export interface LoadedFiles {
 }
 
 export function useFileLoader() {
+  function isSourceMapObject(value: unknown): value is { version: unknown; mappings: unknown } {
+    return typeof value === "object" && value !== null && "version" in value && "mappings" in value;
+  }
+
+  function parseInputText(text: string): LoadedFiles | null {
+    try {
+      const parsed = JSON.parse(text);
+      if (isSourceMapObject(parsed)) {
+        return { generatedCode: "", sourceMapJson: text };
+      }
+    } catch {
+      /* not JSON */
+    }
+
+    const dataUrl = decodeSourceMapDataUrl(text);
+    if (dataUrl != null) {
+      return { generatedCode: "", sourceMapJson: dataUrl };
+    }
+
+    const extracted = extractInlineSourceMap(text);
+    if (extracted) {
+      return { generatedCode: extracted.code, sourceMapJson: extracted.sourceMapJson };
+    }
+
+    return null;
+  }
+
   async function loadFromFiles(files: File[]): Promise<LoadedFiles> {
     let generatedCode = "";
     let sourceMapJson = "";
@@ -13,27 +40,16 @@ export function useFileLoader() {
     for (const file of files) {
       const content = await file.text();
 
-      if (file.name.endsWith(".map") || file.name.endsWith(".json")) {
-        try {
-          const parsed = JSON.parse(content);
-          if (parsed.version && parsed.mappings !== undefined) {
-            sourceMapJson = content;
-            continue;
-          }
-        } catch {
-          /* not JSON */
+      const parsed = parseInputText(content);
+      if (parsed) {
+        if (parsed.generatedCode) {
+          generatedCode = parsed.generatedCode;
         }
+        sourceMapJson = parsed.sourceMapJson;
+        continue;
       }
 
       generatedCode = content;
-    }
-
-    if (generatedCode && !sourceMapJson) {
-      const extracted = extractInlineSourceMap(generatedCode);
-      if (extracted) {
-        generatedCode = extracted.code;
-        sourceMapJson = extracted.sourceMapJson;
-      }
     }
 
     if (!sourceMapJson) {
@@ -46,19 +62,8 @@ export function useFileLoader() {
   }
 
   async function loadFromText(text: string): Promise<LoadedFiles> {
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed.version && parsed.mappings !== undefined) {
-        return { generatedCode: "", sourceMapJson: text };
-      }
-    } catch {
-      /* not JSON */
-    }
-
-    const extracted = extractInlineSourceMap(text);
-    if (extracted) {
-      return { generatedCode: extracted.code, sourceMapJson: extracted.sourceMapJson };
-    }
+    const parsed = parseInputText(text);
+    if (parsed) return parsed;
 
     throw new Error("Could not find a source map in the provided text.");
   }
@@ -91,6 +96,11 @@ export function useFileLoader() {
   }
 
   async function loadFromUrl(url: string): Promise<LoadedFiles> {
+    const inlineDataUrl = decodeSourceMapDataUrl(url);
+    if (inlineDataUrl != null) {
+      return { generatedCode: "", sourceMapJson: inlineDataUrl };
+    }
+
     assertSafeUrl(url);
     const response = await fetch(url);
     if (!response.ok) {
@@ -98,20 +108,8 @@ export function useFileLoader() {
     }
 
     const text = await response.text();
-
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed.version && parsed.mappings !== undefined) {
-        return { generatedCode: "", sourceMapJson: text };
-      }
-    } catch {
-      /* not JSON */
-    }
-
-    const extracted = extractInlineSourceMap(text);
-    if (extracted) {
-      return { generatedCode: extracted.code, sourceMapJson: extracted.sourceMapJson };
-    }
+    const parsed = parseInputText(text);
+    if (parsed) return parsed;
 
     const sourceMapUrlMatch = text.match(/\/\/[#@]\s*sourceMappingURL=(\S+)/);
     if (sourceMapUrlMatch) {

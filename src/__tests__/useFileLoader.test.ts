@@ -22,6 +22,7 @@ const GENERATED_CODE_WITH_INLINE = `var x = 1;
 console.log(x);
 ${JS_SOURCE_MAP_DIRECTIVE}data:application/json;base64,${btoa(VALID_SOURCE_MAP_JSON)}
 `;
+const SOURCE_MAP_DATA_URL = `data:application/json;charset=utf-8;base64,${btoa(VALID_SOURCE_MAP_JSON)}`;
 
 // Helper to create a File object
 function createFile(name: string, content: string): File {
@@ -70,6 +71,15 @@ describe("useFileLoader", () => {
       const parsed = JSON.parse(result.sourceMapJson);
       expect(parsed.version).toBe(3);
       expect(parsed.mappings).toBe(VALID_SOURCE_MAP.mappings);
+    });
+
+    it("loads a file that contains a raw source map data URL", async () => {
+      const dataUrlFile = createFile("bundle.txt", SOURCE_MAP_DATA_URL);
+
+      const result = await loadFromFiles([dataUrlFile]);
+
+      expect(result.generatedCode).toBe("");
+      expect(result.sourceMapJson).toBe(VALID_SOURCE_MAP_JSON);
     });
 
     it("throws when no source map is found", async () => {
@@ -123,6 +133,13 @@ describe("useFileLoader", () => {
       expect(result.generatedCode).not.toContain("sourceMappingURL");
       const parsed = JSON.parse(result.sourceMapJson);
       expect(parsed.version).toBe(3);
+    });
+
+    it("loads raw source map data URLs", async () => {
+      const result = await loadFromText(SOURCE_MAP_DATA_URL);
+
+      expect(result.generatedCode).toBe("");
+      expect(result.sourceMapJson).toBe(VALID_SOURCE_MAP_JSON);
     });
 
     it("throws for plain code without source map", async () => {
@@ -229,6 +246,16 @@ describe("useFileLoader", () => {
       expect(result.generatedCode).toBe("");
       expect(result.sourceMapJson).toBe(VALID_SOURCE_MAP_JSON);
       expect(globalThis.fetch).toHaveBeenCalledWith("https://example.com/bundle.js.map");
+    });
+
+    it("loads raw source map data URLs without fetching", async () => {
+      globalThis.fetch = vi.fn();
+
+      const result = await loadFromUrl(SOURCE_MAP_DATA_URL);
+
+      expect(result.generatedCode).toBe("");
+      expect(result.sourceMapJson).toBe(VALID_SOURCE_MAP_JSON);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
     });
 
     it("loads code with inline source map from URL", async () => {

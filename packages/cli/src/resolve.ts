@@ -9,7 +9,7 @@ export interface ResolvedSourceMap {
 
 // Inline base64
 const INLINE_SOURCE_MAP_RE =
-  /(?:\/\/[#@]\s*sourceMappingURL=|\/\*[#@]\s*sourceMappingURL=)(data:application\/json;base64,([A-Za-z0-9+/=]+))\s*\*?\/?\s*$/m;
+  /(?:\/\/[#@]\s*sourceMappingURL=|\/\*[#@]\s*sourceMappingURL=)(data:[^\s*]+)\s*\*?\/?\s*$/m;
 
 // External file reference
 const EXTERNAL_SOURCE_MAP_RE =
@@ -17,6 +17,34 @@ const EXTERNAL_SOURCE_MAP_RE =
 
 const SOURCE_MAP_EXTENSIONS = new Set([".map", ".json"]);
 const GENERATED_CODE_EXTENSIONS = new Set([".js", ".ts", ".css"]);
+
+function decodeSourceMapDataUrl(input: string): string | null {
+  const trimmed = input.trim();
+  if (trimmed.slice(0, 5).toLowerCase() !== "data:") return null;
+
+  const commaIndex = trimmed.indexOf(",");
+  if (commaIndex === -1) return null;
+
+  const metadata = trimmed.slice(5, commaIndex);
+  const payload = trimmed.slice(commaIndex + 1);
+  const parts = metadata
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const mimeType = parts.shift()?.toLowerCase() ?? "";
+  if (mimeType !== "application/json") return null;
+
+  const isBase64 = parts.some((part) => part.toLowerCase() === "base64");
+
+  try {
+    const decodedPayload = decodeURIComponent(payload);
+    return isBase64
+      ? Buffer.from(decodedPayload.replace(/\s+/g, ""), "base64").toString("utf-8")
+      : decodedPayload;
+  } catch {
+    return null;
+  }
+}
 
 function readFile(filePath: string): string {
   const absolute = resolve(filePath);
@@ -67,8 +95,10 @@ function resolveFromGeneratedCode(
   // 1. Check for inline base64 sourceMappingURL
   const inlineMatch = generatedCode.match(INLINE_SOURCE_MAP_RE);
   if (inlineMatch) {
-    const base64 = inlineMatch[2];
-    const sourceMapJson = Buffer.from(base64, "base64").toString("utf-8");
+    const sourceMapJson = decodeSourceMapDataUrl(inlineMatch[1]);
+    if (sourceMapJson == null) {
+      throw new Error(`Invalid inline source map data URL in ${name}`);
+    }
     // Strip the sourceMappingURL comment from the generated code
     const cleanedCode = generatedCode.replace(INLINE_SOURCE_MAP_RE, "");
     return { sourceMapJson, generatedCode: cleanedCode };

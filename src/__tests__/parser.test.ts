@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vite-plus/test";
-import { parseSourceMap, extractInlineSourceMap } from "../core/parser";
+import { decodeSourceMapDataUrl, parseSourceMap, extractInlineSourceMap } from "../core/parser";
 
 const JS_SOURCE_MAP_DIRECTIVE = "//# source" + "MappingURL=";
 const CSS_SOURCE_MAP_DIRECTIVE = "/*# source" + "MappingURL=";
@@ -95,8 +95,33 @@ describe("extractInlineSourceMap", () => {
     expect(result!.sourceMapJson).toBe(sourceMap);
   });
 
+  it("extracts inline source map when the data URL includes charset metadata", () => {
+    const sourceMap = JSON.stringify({ version: 3, sources: [], mappings: "" });
+    const base64 = btoa(sourceMap);
+    const code = `console.log("hi");\n${JS_SOURCE_MAP_DIRECTIVE}data:application/json;charset=utf-8;base64,${base64}\n`;
+
+    const result = extractInlineSourceMap(code);
+    expect(result).not.toBeNull();
+    expect(result!.sourceMapJson).toBe(sourceMap);
+  });
+
   it("returns null when no inline source map found", () => {
     const result = extractInlineSourceMap('console.log("hi");');
     expect(result).toBeNull();
+  });
+});
+
+describe("decodeSourceMapDataUrl", () => {
+  it("decodes standalone base64 data URLs with charset metadata", () => {
+    const sourceMap = JSON.stringify({ version: 3, sources: [], mappings: "" });
+    const base64 = btoa(sourceMap);
+
+    expect(decodeSourceMapDataUrl(`data:application/json;charset=utf-8;base64,${base64}`)).toBe(
+      sourceMap,
+    );
+  });
+
+  it("returns null for non-JSON data URLs", () => {
+    expect(decodeSourceMapDataUrl("data:text/plain;base64,SGVsbG8=")).toBeNull();
   });
 });
