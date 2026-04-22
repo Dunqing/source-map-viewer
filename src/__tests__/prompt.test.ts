@@ -145,16 +145,17 @@ describe("generateDebugPrompt", () => {
       "| 1:0 | `return value;` | → | 1:0 | `return value;` | input.js | ⚡ generated-whitespace |",
     );
     expect(prompt).toContain(
-      "Original → Generated. Flags: ⚠️ invalid position, ✂️ splits a token, ⚡ generated-whitespace, ⚡ original-whitespace.",
+      "Original → Generated. Flags: ⚠️ invalid position, ✂️ boundary-crossing heuristic, ⚡ generated-whitespace, ⚡ original-whitespace.",
     );
     expect(prompt).toContain(
       "| Orig | Original code | → | Gen | Generated code | Source | Flags |",
     );
-    expect(prompt).toContain("| Split-token mappings | 0 |");
+    expect(prompt).toContain("| Boundary-crossing heuristics | 0 |");
     expect(prompt).toContain("| Suspicious mappings | 1 |");
     expect(prompt).toContain("## Primary suspect");
     expect(prompt).toContain("## Pattern summary");
-    expect(prompt).toContain("Generated mapped range:");
+    expect(prompt).toContain("Raw mapping point:");
+    expect(prompt).toContain("Generated inferred range to next boundary:");
     expect(prompt).toContain("## Original code excerpts");
     expect(prompt).toContain("## Generated code excerpt");
   });
@@ -213,17 +214,21 @@ describe("generateDebugPrompt", () => {
     expect(prompt).toContain("## Primary suspect");
     expect(prompt).toContain("Segment #2");
     expect(prompt).not.toContain("selected in viewer");
-    expect(prompt).toContain("Flags: ✂️ split-token");
+    expect(prompt).toContain("Flags: ✂️ boundary-crossing heuristic");
     expect(prompt).toContain("One plausible common cause:");
     expect(prompt).toContain("Region 1:");
-    expect(prompt).toContain("| Split-token mappings | 2 |");
+    expect(prompt).toContain("| Boundary-crossing heuristics | 2 |");
     expect(prompt).toContain("| Suspicious mappings | 2 |");
-    expect(prompt).toContain("Original mapped range:");
-    expect(prompt).toContain("Generated mapped range:");
+    expect(prompt).toContain("Raw mapping point:");
+    expect(prompt).toContain("Original inferred range to next boundary:");
+    expect(prompt).toContain("Generated inferred range to next boundary:");
     expect(prompt).toContain("Next generated boundary: 2:0");
     expect(prompt).toContain("## Mapping table (showing");
     expect(prompt).toContain("showing 5 focused rows from 1 suspicious region out of 52 total");
-    expect(prompt).toContain("✂️ split-token");
+    expect(prompt).toContain("✂️ boundary-crossing heuristic");
+    expect(prompt).toContain(
+      "This is a heuristic signal from neighboring points, not proof that the individual mapping point is wrong.",
+    );
     expect(prompt).not.toContain(" 50 | noop();");
   });
 
@@ -340,7 +345,7 @@ describe("generateDebugPrompt", () => {
     });
 
     expect(prompt).toContain("| Invalid mappings | 1 |");
-    expect(prompt).toContain("| Split-token mappings | 0 |");
+    expect(prompt).toContain("| Boundary-crossing heuristics | 0 |");
     expect(prompt).toContain("| Suspicious mappings | 0 |");
     expect(prompt).toContain("**1 invalid mapping(s)**");
     expect(prompt).toContain("First at generated position 9:4");

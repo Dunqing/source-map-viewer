@@ -188,7 +188,7 @@ function getNextOriginalBoundary(
 function buildFlagLabels(mapping: PromptMappingRow): string[] {
   const flags: string[] = [];
   if (mapping.isBad) flags.push("⚠️ invalid");
-  if (mapping.isSplitToken) flags.push("✂️ split-token");
+  if (mapping.isSplitToken) flags.push("✂️ boundary-crossing heuristic");
   if (mapping.isGeneratedWhitespaceTarget) flags.push("⚡ generated-whitespace");
   if (mapping.isOriginalWhitespaceTarget) flags.push("⚡ original-whitespace");
   return flags;
@@ -463,9 +463,9 @@ function buildPatternSummary(
 
   const likelyCause =
     suspiciousRows.some((mapping) => mapping.isSplitToken) && generatedWhitespaceRows > 0
-      ? "One plausible common cause: generated columns are being recorded before final printed token boundaries are stable, especially after indentation and code rewriting, so mappings land in generated whitespace or inside the first emitted token."
+      ? "One plausible common cause: generated columns are being recorded before final printed token boundaries are stable, especially after indentation and code rewriting, so mappings land in generated whitespace and neighboring points make the inferred boundary ranges look like they cross code tokens."
       : suspiciousRows.some((mapping) => mapping.isSplitToken)
-        ? "One plausible common cause: source-map spans are anchored to enclosing statements or pre-rewrite ranges instead of the exact emitted token boundary."
+        ? "One plausible common cause: adjacent mapping points suggest boundaries anchored to enclosing statements or pre-rewrite ranges instead of the exact emitted token boundary."
         : "One plausible common cause: generated columns are recorded before indentation or whitespace is applied to the final output.";
 
   return [
@@ -710,9 +710,9 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
               `- Suspicious region: ${primaryCluster.rows.length} mapping(s), original lines ${primaryCluster.rows[0].seg.originalLine + 1}-${primaryCluster.rows[primaryCluster.rows.length - 1].seg.originalLine + 1}, generated lines ${primaryCluster.rows[0].seg.generatedLine + 1}-${primaryCluster.rows[primaryCluster.rows.length - 1].seg.generatedLine + 1}`,
             ]
           : []),
-        `- Original ${primarySuspect.orig} \`${primarySuspect.origSnippet}\` → Generated ${primarySuspect.gen} \`${primarySuspect.genSnippet}\``,
+        `- Raw mapping point: Original ${primarySuspect.orig} \`${primarySuspect.origSnippet}\` → Generated ${primarySuspect.gen} \`${primarySuspect.genSnippet}\``,
         `- Flags: ${primarySuspectFlags.length > 0 ? primarySuspectFlags.join(", ") : "none"}`,
-        `- Original mapped range: ${formatRangeLabel(
+        `- Original inferred range to next boundary: ${formatRangeLabel(
           primarySuspect.seg.originalLine,
           primarySuspect.seg.originalColumn,
           primaryOriginalRangeEnd,
@@ -721,7 +721,7 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
           primarySuspect.seg.originalColumn,
           primaryOriginalRangeEnd,
         )}\``,
-        `- Generated mapped range: ${formatRangeLabel(
+        `- Generated inferred range to next boundary: ${formatRangeLabel(
           primarySuspect.seg.generatedLine,
           primarySuspect.seg.generatedColumn,
           primaryGeneratedRangeEnd,
@@ -737,7 +737,7 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
           : []),
         ...(primarySuspect.isSplitToken
           ? [
-              "- Why suspicious: the mapped span does not align to a real token boundary. It crosses emitted token boundaries and/or ends inside an identifier, so the sourcemap is semantically wrong even if it is spec-valid.",
+              "- Why suspicious: adjacent mapping boundaries suggest an inferred span that crosses emitted token boundaries and/or ends inside an identifier. This is a heuristic signal from neighboring points, not proof that the individual mapping point is wrong.",
             ]
           : primarySuspect.isGeneratedWhitespaceTarget
             ? [
@@ -792,7 +792,7 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
     `| Total mappings | ${totalMappings} |`,
     `| Coverage | ${coveragePercent}% of generated code |`,
     `| Invalid mappings | ${badCount} |`,
-    `| Split-token mappings | ${splitTokenCount} |`,
+    `| Boundary-crossing heuristics | ${splitTokenCount} |`,
     `| Suspicious mappings | ${suspiciousCount} |`,
     `| Quality warnings | ${qualityWarnings.length} |`,
     `| Names | ${parsedData.names.length > 0 ? parsedData.names.length : "none"} |`,
@@ -810,7 +810,7 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
             : []),
           ...(splitTokenCount > 0
             ? [
-                `- ${splitTokenCount} mapping(s) split a token/identifier boundary. This is semantically wrong even when the VLQ data is spec-valid.`,
+                `- ${splitTokenCount} mapping(s) have adjacent boundaries that cut through a token/identifier. This is a heuristic based on neighboring mapping points, not a spec violation by itself.`,
                 "",
               ]
             : []),
@@ -837,7 +837,7 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
     "",
     `## Mapping table (${mappingNote})`,
     "",
-    "Original → Generated. Flags: ⚠️ invalid position, ✂️ splits a token, ⚡ generated-whitespace, ⚡ original-whitespace.",
+    "Original → Generated. Flags: ⚠️ invalid position, ✂️ boundary-crossing heuristic, ⚡ generated-whitespace, ⚡ original-whitespace.",
     "",
     header,
     divider,
@@ -848,7 +848,7 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
     "## Analysis instructions",
     "",
     "1. **Start with the primary suspect** — Explain whether that mapping is genuinely wrong or merely reflects expected source-level changes (type erasure, helper insertion, wrapper generation, minification, etc.).",
-    "2. **Inspect the boundary** — Use the mapped ranges above to identify the exact generated/original token boundary that should have been recorded instead.",
+    "2. **Inspect the boundary** — Use the raw mapping point and the inferred next-boundary ranges above to identify the exact generated/original token boundary that should have been recorded instead.",
     "3. **Identify the pattern** — Decide whether the bug is indentation drift, token-span selection, helper or wrapper generation, printer timing, or another source-map generation pattern.",
     "4. **Suggest a fix** — Point to the source-map recording logic that should change, and describe the exact span/column that should be recorded.",
     "",
