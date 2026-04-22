@@ -16,6 +16,10 @@ jobs:
         with:
           cache: true
           run-install: false
+      - uses: actions/setup-node@v4
+        with:
+          registry-url: https://npm.pkg.github.com
+          scope: "@void-sdk"
       - run: vp install
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
