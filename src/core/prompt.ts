@@ -1,6 +1,11 @@
 import type { MappingDiagnostic, MappingSegment, SourceMapData } from "./types";
 import { detectLanguage } from "../composables/useHighlighter";
 
+/** Escape markdown-structural characters in untrusted metadata strings. */
+export function escapeMarkdown(s: string): string {
+  return s.replace(/[[\](){}#*_`|~<>!\\]/g, "\\$&");
+}
+
 export interface DebugPromptInput {
   generatedCode: string;
   sourceMapJson: string;
@@ -46,7 +51,7 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
       orig: `${seg.originalLine + 1}:${seg.originalColumn}`,
       genSnippet,
       origSnippet,
-      source: sources[seg.sourceIndex] ?? "?",
+      source: escapeMarkdown(sources[seg.sourceIndex] ?? "?"),
       isBad,
     };
   });
@@ -93,10 +98,10 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
     "",
     "## Summary",
     "",
-    `- **Sources:** ${sources.join(", ")}`,
+    `- **Sources:** ${sources.map(escapeMarkdown).join(", ")}`,
     `- **Total mappings:** ${totalMappings}`,
     `- **Bad mappings:** ${badCount} (${Math.round((badCount / totalMappings) * 100)}%)`,
-    `- **Names in source map:** ${parsedData.names.length > 0 ? parsedData.names.join(", ") : "(none)"}`,
+    `- **Names in source map:** ${parsedData.names.length > 0 ? parsedData.names.map(escapeMarkdown).join(", ") : "(none)"}`,
     ...(visualizationUrl
       ? [`- **Visualization:** [Open in Source Map Viz](${visualizationUrl})`]
       : []),

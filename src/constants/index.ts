@@ -1,4 +1,4 @@
-export const APP_NAME = "Source Map Visualization";
+export const APP_NAME = "Source Map Viewer";
 export const APP_DESCRIPTION = "Inspect and debug source map mappings, visually";
 
 // Number of segment highlight colors (--seg-0 … --seg-6 in layout.vue)

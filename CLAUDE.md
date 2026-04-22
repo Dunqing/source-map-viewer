@@ -28,7 +28,7 @@ Requires GitHub Packages auth for `@void-sdk` private packages:
 
 ## Architecture
 
-Source map visualization tool that shows how generated code positions map back to original source. Built with Vue 3 + Void SDK (SSR on Cloudflare Workers) + Vite+.
+Source map viewer tool that shows how generated code positions map back to original source. Built with Vue 3 + Void SDK (SSR on Cloudflare Workers) + Vite+.
 
 ### Data Flow
 

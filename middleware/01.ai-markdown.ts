@@ -25,8 +25,6 @@ function shouldServeMarkdown(req: { header(name: string): string | undefined }):
   const ua = req.header("user-agent") || "";
   if (AI_BOT_PATTERNS.some((p) => ua.includes(p))) return true;
 
-  if (!accept.includes("text/html")) return true;
-
   return false;
 }
 
@@ -56,8 +54,14 @@ export default defineMiddleware(async (c, next) => {
   const url = new URL(c.req.url);
   const path = url.pathname;
 
-  // Skip root, static assets, API routes, and Void internals
-  if (path === "/" || path.includes(".") || path.startsWith("/__") || path.startsWith("/api/")) {
+  // Skip root, static assets, API routes, pages, and Void internals
+  if (
+    path === "/" ||
+    path.includes(".") ||
+    path.startsWith("/__") ||
+    path.startsWith("/api/") ||
+    path === "/compare"
+  ) {
     return next();
   }
 

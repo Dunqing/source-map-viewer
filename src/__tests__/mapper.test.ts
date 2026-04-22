@@ -4,6 +4,7 @@ import {
   buildInverseMappingIndex,
   findMappingForGenerated,
   findMappingsForOriginal,
+  clampOriginalPosition,
 } from "../core/mapper";
 import type { MappingSegment } from "../core/types";
 
@@ -95,5 +96,73 @@ describe("findMappingsForOriginal", () => {
   it("returns empty array for unmapped position", () => {
     const results = findMappingsForOriginal(inverse, 0, 99, 0);
     expect(results).toHaveLength(0);
+  });
+});
+
+describe("clampOriginalPosition", () => {
+  const sourceLines = ["function foo() {", "  return 42;", "}"];
+
+  it("returns position unchanged when within bounds", () => {
+    const result = clampOriginalPosition(1, 5, sourceLines);
+    expect(result).toEqual({ line: 1, column: 5 });
+  });
+
+  it("clamps line to last line when originalLine exceeds total lines", () => {
+    const result = clampOriginalPosition(100, 0, sourceLines);
+    expect(result).toEqual({ line: 2, column: 0 });
+  });
+
+  it("clamps column to line length when originalColumn exceeds line content", () => {
+    // line 1 is "  return 42;" (12 chars), column 50 should clamp to 12
+    const result = clampOriginalPosition(1, 50, sourceLines);
+    expect(result).toEqual({ line: 1, column: 12 });
+  });
+
+  it("clamps both line and column when both exceed bounds", () => {
+    const result = clampOriginalPosition(999, 999, sourceLines);
+    // Last line is "}" (1 char), so line=2, column=1
+    expect(result).toEqual({ line: 2, column: 1 });
+  });
+
+  it("clamps negative line to 0", () => {
+    const result = clampOriginalPosition(-5, 3, sourceLines);
+    expect(result).toEqual({ line: 0, column: 3 });
+  });
+
+  it("clamps negative column to 0", () => {
+    const result = clampOriginalPosition(0, -10, sourceLines);
+    expect(result).toEqual({ line: 0, column: 0 });
+  });
+
+  it("returns (0, 0) for empty source", () => {
+    const result = clampOriginalPosition(5, 10, []);
+    expect(result).toEqual({ line: 0, column: 0 });
+  });
+
+  it("handles column at exact end of line (valid)", () => {
+    // line 0 is "function foo() {" (16 chars), column 16 is valid (end of line)
+    const result = clampOriginalPosition(0, 16, sourceLines);
+    expect(result).toEqual({ line: 0, column: 16 });
+  });
+
+  it("handles single-line source", () => {
+    const singleLine = ["hello"];
+    expect(clampOriginalPosition(0, 3, singleLine)).toEqual({ line: 0, column: 3 });
+    expect(clampOriginalPosition(5, 0, singleLine)).toEqual({ line: 0, column: 0 });
+  });
+
+  it("handles source with empty lines", () => {
+    const withEmpty = ["abc", "", "def"];
+    // clamping column on the empty line (line 1, col 5) → col 0
+    const result = clampOriginalPosition(1, 5, withEmpty);
+    expect(result).toEqual({ line: 1, column: 0 });
+  });
+
+  it("handles source with trailing newline", () => {
+    const trailingNewline = ["abc", "def", ""];
+    // line 2 col 0 is valid (empty last line)
+    expect(clampOriginalPosition(2, 0, trailingNewline)).toEqual({ line: 2, column: 0 });
+    // line 2 col 1 clamps to 0 since the line is empty
+    expect(clampOriginalPosition(2, 1, trailingNewline)).toEqual({ line: 2, column: 0 });
   });
 });

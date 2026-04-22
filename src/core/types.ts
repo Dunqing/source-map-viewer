@@ -23,7 +23,7 @@ export type InverseMappingIndex = Map<number, MappingSegment[]>;
 
 export interface MappingDiagnostic {
   segment: MappingSegment;
-  type: "invalid-source" | "out-of-bounds" | "unmapped" | "suspicious";
+  type: "invalid-source" | "out-of-bounds";
   message: string;
 }
 

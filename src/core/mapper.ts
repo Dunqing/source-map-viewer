@@ -1,5 +1,29 @@
 import type { InverseMappingIndex, MappingIndex, MappingSegment } from "./types";
 
+/**
+ * Clamp an original position to valid bounds within source content,
+ * matching Chrome DevTools behavior.
+ *
+ * Chrome does:
+ *   const line = doc.line(Math.max(1, Math.min(doc.lines, lineNumber + 1)));
+ *   return Math.max(line.from, Math.min(line.to, line.from + columnNumber));
+ */
+export function clampOriginalPosition(
+  originalLine: number,
+  originalColumn: number,
+  sourceLines: string[],
+): { line: number; column: number } {
+  if (sourceLines.length === 0) {
+    return { line: 0, column: 0 };
+  }
+
+  const line = Math.max(0, Math.min(sourceLines.length - 1, originalLine));
+  const lineContent = sourceLines[line];
+  const column = Math.max(0, Math.min(lineContent.length, originalColumn));
+
+  return { line, column };
+}
+
 export function buildMappingIndex(segments: MappingSegment[]): MappingIndex {
   return [...segments].sort((a, b) => {
     if (a.generatedLine !== b.generatedLine) return a.generatedLine - b.generatedLine;

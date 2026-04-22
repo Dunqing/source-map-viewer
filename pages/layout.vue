@@ -5,10 +5,10 @@ import "virtual:uno.css";
 const jsonLd = JSON.stringify({
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "Source Map Visualization",
+  name: "Source Map Viewer",
   description:
     "Interactive tool to visualize and debug JavaScript/CSS source map mappings. Upload, paste, or fetch source maps to see how generated code positions map back to original source.",
-  url: "https://source-map-visualization.voidzero.dev",
+  url: "https://source-map-viewer.void.app",
   applicationCategory: "DeveloperApplication",
   operatingSystem: "Any",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
@@ -20,7 +20,7 @@ const jsonLd = JSON.stringify({
     "File upload, paste, and URL fetch input modes",
     "Shareable URLs with embedded source map data",
   ],
-});
+}).replace(/<\//g, "<\\/");
 </script>
 
 <template>
@@ -30,7 +30,7 @@ const jsonLd = JSON.stringify({
     <div
       style="max-width: 600px; margin: 2rem auto; padding: 1rem; font-family: system-ui, sans-serif"
     >
-      <h1>Source Map Visualization</h1>
+      <h1>Source Map Viewer</h1>
       <p>
         This is an interactive tool for visualizing and debugging JavaScript/CSS source map
         mappings. It shows how generated code positions map back to original source with color-coded

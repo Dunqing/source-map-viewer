@@ -35,9 +35,27 @@ onMounted(() => {
   const initialTab = Number(params.get("tab"));
   if (initialTab > 0) store.setActiveSource(initialTab);
 
+  const segParam = params.get("seg");
+
   // Show content after mount cascade settles
   requestAnimationFrame(() => {
     ready.value = true;
+
+    // Restore segment selection after panels are mounted (double rAF)
+    if (segParam != null && Number(segParam) >= 0 && Number(segParam) < store.mappingIndex.length) {
+      const initialSeg = Number(segParam);
+      requestAnimationFrame(() => {
+        const segToSelect = store.mappingIndex[initialSeg];
+        store.setHoveredSegment(segToSelect);
+        store.setActiveSource(segToSelect.sourceIndex);
+        originalPanelRef.value?.scrollToLine(segToSelect.originalLine);
+        generatedPanelRef.value?.scrollToLine(segToSelect.generatedLine);
+        if (showMappings.value) {
+          mappingsPanelRef.value?.scrollToHovered();
+        }
+      });
+    }
+
     // Enable URL sync after first real render
     setTimeout(() => {
       urlSyncEnabled = true;
@@ -53,13 +71,20 @@ function syncUrlParams() {
     if (store.activeSourceIndex > 0) p.set("tab", String(store.activeSourceIndex));
     if (showMappings.value) p.set("mappings", "1");
     if (showStats.value) p.set("stats", "1");
+    if (store.hoveredSegment) {
+      const idx = store.mappingIndex.indexOf(store.hoveredSegment);
+      if (idx >= 0) p.set("seg", String(idx));
+    }
     const search = p.toString();
-    const newUrl = `${window.location.pathname}${search ? "?" + search : ""}${window.location.hash}`;
+    const newUrl = `${window.location.pathname}${search ? "?" + search : ""}`;
     window.history.replaceState(null, "", newUrl);
   }, 16);
 }
 
-watch([showMappings, showStats, () => store.activeSourceIndex], syncUrlParams);
+watch(
+  [showMappings, showStats, () => store.activeSourceIndex, () => store.hoveredSegment],
+  syncUrlParams,
+);
 const showAiDebug = ref(false);
 const showSearch = ref(false);
 const searchQuery = ref("");
@@ -139,6 +164,24 @@ function handleMappingClick(segment: MappingSegment) {
   }
 }
 
+async function handleCompare() {
+  try {
+    const res = await fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        generatedCode: store.generatedCode,
+        sourceMapJson: store.sourceMapJson,
+      }),
+    });
+    if (!res.ok) throw new Error("Share failed");
+    const { id } = await res.json();
+    window.location.href = `/compare?a=${id}`;
+  } catch {
+    showToast("Failed to start compare");
+  }
+}
+
 async function handleShare() {
   try {
     // Try short URL via API
@@ -183,6 +226,7 @@ async function handleShare() {
       @home="handleBack"
       @ai-debug="showAiDebug = true"
       @share="handleShare"
+      @compare="handleCompare"
     />
 
     <div v-if="ready" class="flex-1 flex overflow-hidden relative">

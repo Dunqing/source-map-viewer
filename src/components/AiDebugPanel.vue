@@ -10,7 +10,7 @@ const { prompt } = useAiDebugPrompt();
 const copied = ref(false);
 const renderedHtml = ref("");
 
-const md = new MarkdownIt();
+const md = new MarkdownIt({ html: false });
 
 onMounted(async () => {
   const { fromHighlighter } = await import("@shikijs/markdown-it");

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import IconShare from "~icons/carbon/share";
+import IconCompare from "~icons/carbon/compare";
 import IconDebug from "~icons/carbon/debug";
 import IconChartBar from "~icons/carbon/chart-bar";
 import IconDataTable from "~icons/carbon/data-table";
@@ -29,6 +30,7 @@ const emit = defineEmits<{
   home: [];
   aiDebug: [];
   share: [];
+  compare: [];
 }>();
 </script>
 
@@ -49,6 +51,13 @@ const emit = defineEmits<{
     >
       <IconShare class="w-3.5 h-3.5" />
       Share
+    </button>
+    <button
+      class="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-fg-dim hover:bg-muted transition"
+      @click="emit('compare')"
+    >
+      <IconCompare class="w-3.5 h-3.5" />
+      Compare
     </button>
     <button
       class="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-fg-dim hover:bg-muted transition"

@@ -12,27 +12,27 @@
       { "name": "color-scheme", "content": "light dark" },
       {
         "name": "description",
-        "content": "Visualize and debug JavaScript/CSS source map mappings. Upload, paste, or fetch source maps to see how generated code positions map back to original source with interactive segment highlighting."
+        "content": "Inspect and debug JavaScript/CSS source map mappings. Upload, paste, or fetch source maps to see how generated code positions map back to original source with interactive segment highlighting."
       },
-      { "property": "og:title", "content": "Source Map Visualization" },
+      { "property": "og:title", "content": "Source Map Viewer" },
       {
         "property": "og:description",
-        "content": "Interactive tool to visualize and debug source map mappings. See how generated code maps back to original source with segment highlighting and diagnostics."
+        "content": "Interactive tool to inspect and debug source map mappings. See how generated code maps back to original source with segment highlighting and diagnostics."
       },
       { "property": "og:type", "content": "website" },
-      { "property": "og:url", "content": "https://source-map-visualization.voidzero.dev" },
+      { "property": "og:url", "content": "https://source-map-viewer.void.app" },
       { "name": "twitter:card", "content": "summary" },
-      { "name": "twitter:title", "content": "Source Map Visualization" },
+      { "name": "twitter:title", "content": "Source Map Viewer" },
       {
         "name": "twitter:description",
-        "content": "Interactive tool to visualize and debug source map mappings. See how generated code maps back to original source."
+        "content": "Interactive tool to inspect and debug source map mappings. See how generated code maps back to original source."
       }
     ],
     "link": [{ "rel": "icon", "type": "image/svg+xml", "href": "/logo.svg" }],
-    "title": "Source Map Visualization",
+    "title": "Source Map Viewer",
     "script": [
       {
-        "innerHTML": "if(localStorage.getItem('source-map-viz-theme')==='dark'||(!localStorage.getItem('source-map-viz-theme')&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}if(location.pathname.length>1){document.documentElement.classList.add('has-hash')}"
+        "innerHTML": "if(localStorage.getItem('source-map-viz-theme')==='dark'||(!localStorage.getItem('source-map-viz-theme')&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}if(location.pathname.length>1&&location.pathname!=='/compare'){document.documentElement.classList.add('has-hash')}"
       }
     ]
   }

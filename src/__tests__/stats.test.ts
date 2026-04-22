@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vite-plus/test";
 import { calculateStats } from "../core/stats";
 import { buildMappingIndex } from "../core/mapper";
+import { validateMappings } from "../core/validator";
 import type { MappingDiagnostic, SourceMapData } from "../core/types";
 
 describe("calculateStats", () => {
@@ -67,5 +68,35 @@ describe("calculateStats", () => {
 
     const stats = calculateStats(data, "x", diagnostics, buildMappingIndex(data.mappings));
     expect(stats.badMappings).toBe(1);
+  });
+
+  it("reports zero badMappings when out-of-bounds positions are in source map", () => {
+    const data: SourceMapData = {
+      version: 3,
+      sources: ["a.js"],
+      sourcesContent: ["line1\nline2"],
+      names: [],
+      mappings: [
+        {
+          generatedLine: 0,
+          generatedColumn: 0,
+          originalLine: 999,
+          originalColumn: 0,
+          sourceIndex: 0,
+          nameIndex: null,
+        },
+      ],
+    };
+    const generatedCode = "var x = 1;";
+    const diagnostics = validateMappings(data);
+    expect(diagnostics).toHaveLength(0);
+
+    const stats = calculateStats(
+      data,
+      generatedCode,
+      diagnostics,
+      buildMappingIndex(data.mappings),
+    );
+    expect(stats.badMappings).toBe(0);
   });
 });

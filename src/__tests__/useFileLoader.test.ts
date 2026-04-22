@@ -162,6 +162,53 @@ describe("useFileLoader", () => {
     });
   });
 
+  describe("loadFromUrl - SSRF protection", () => {
+    const originalFetch = globalThis.fetch;
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+    });
+
+    it("rejects non-HTTP protocols", async () => {
+      globalThis.fetch = vi.fn();
+      await expect(loadFromUrl("ftp://example.com/file.js")).rejects.toThrow("Only HTTP(S) URLs");
+      await expect(loadFromUrl("file:///etc/passwd")).rejects.toThrow("Only HTTP(S) URLs");
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it("rejects localhost", async () => {
+      globalThis.fetch = vi.fn();
+      await expect(loadFromUrl("http://localhost/file.js")).rejects.toThrow("private/internal");
+      await expect(loadFromUrl("http://127.0.0.1/file.js")).rejects.toThrow("private/internal");
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it("rejects private IPv4 ranges", async () => {
+      globalThis.fetch = vi.fn();
+      await expect(loadFromUrl("http://10.0.0.1/file.js")).rejects.toThrow("private/internal");
+      await expect(loadFromUrl("http://192.168.1.1/file.js")).rejects.toThrow("private/internal");
+      await expect(loadFromUrl("http://172.16.0.1/file.js")).rejects.toThrow("private/internal");
+      await expect(loadFromUrl("http://169.254.1.1/file.js")).rejects.toThrow("private/internal");
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it("rejects IPv6 loopback and private ranges", async () => {
+      globalThis.fetch = vi.fn();
+      await expect(loadFromUrl("http://[::1]/file.js")).rejects.toThrow("private/internal");
+      await expect(loadFromUrl("http://0.0.0.0/file.js")).rejects.toThrow("private/internal");
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it("allows public HTTPS URLs", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(VALID_SOURCE_MAP_JSON),
+      });
+      const result = await loadFromUrl("https://cdn.example.com/bundle.js.map");
+      expect(result.sourceMapJson).toBe(VALID_SOURCE_MAP_JSON);
+    });
+  });
+
   describe("loadFromUrl", () => {
     const originalFetch = globalThis.fetch;
 

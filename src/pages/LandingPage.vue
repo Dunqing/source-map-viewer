@@ -337,6 +337,17 @@ function formatTimeAgo(timestamp: number): string {
         </div>
       </div>
 
+      <!-- Compare -->
+      <a
+        href="/compare"
+        class="block rounded-xl border border-edge bg-surface p-4 hover:bg-muted transition"
+      >
+        <span class="text-sm font-semibold text-fg">Compare Source Maps</span>
+        <p class="text-xs text-fg-muted mt-1">
+          Diff two source maps to see which mappings changed, were added, or removed
+        </p>
+      </a>
+
       <!-- Footer -->
       <div
         class="border-t border-edge pt-4 flex items-center justify-between text-xs text-fg-muted"

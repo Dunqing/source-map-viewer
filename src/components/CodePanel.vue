@@ -3,6 +3,7 @@ import { computed, ref, nextTick, onMounted, onUnmounted } from "vue";
 import { useVirtualScroll } from "../composables/useVirtualScroll";
 import { useHighlighter } from "../composables/useHighlighter";
 import { useSourceMapStore } from "../stores/sourceMap";
+import { clampOriginalPosition } from "../core/mapper";
 import {
   SEGMENT_COLOR_COUNT,
   LINE_HEIGHT,
@@ -10,8 +11,21 @@ import {
   FALLBACK_CHAR_WIDTH,
 } from "../constants";
 import { useTheme } from "../composables/useTheme";
+import IconCopy from "~icons/carbon/copy";
+import IconCheckmark from "~icons/carbon/checkmark";
 import type { MappingSegment } from "../core/types";
 import type { ThemedToken } from "shiki/core";
+
+const copied = ref(false);
+
+function copyCode() {
+  navigator.clipboard.writeText(props.code).then(() => {
+    copied.value = true;
+    setTimeout(() => {
+      copied.value = false;
+    }, 2000);
+  });
+}
 
 const props = defineProps<{
   code: string;
@@ -49,6 +63,26 @@ const allTokens = computed<ThemedToken[][]>(() => {
   return tokenizeLines(props.code, lang);
 });
 
+/**
+ * For the original side, maps each segment to its clamped line/column.
+ * Segments with out-of-bounds originalLine/originalColumn are clamped
+ * to the nearest valid position (Chrome DevTools behavior).
+ */
+const clampedPositionCache = computed(() => {
+  const cache = new Map<MappingSegment, { line: number; column: number }>();
+  if (props.side !== "original") return cache;
+
+  const sourceSegs = store.inverseMappingIndex.get(store.activeSourceIndex);
+  if (!sourceSegs) return cache;
+
+  const sourceLines = lines.value;
+  for (const seg of sourceSegs) {
+    const clamped = clampOriginalPosition(seg.originalLine, seg.originalColumn, sourceLines);
+    cache.set(seg, clamped);
+  }
+  return cache;
+});
+
 const lineSegmentsMap = computed(() => {
   const map = new Map<number, MappingSegment[]>();
 
@@ -63,10 +97,12 @@ const lineSegmentsMap = computed(() => {
     const sourceSegs = store.inverseMappingIndex.get(store.activeSourceIndex);
     if (sourceSegs) {
       for (const seg of sourceSegs) {
-        if (!map.has(seg.originalLine)) {
-          map.set(seg.originalLine, []);
+        const clamped = clampedPositionCache.value.get(seg);
+        const line = clamped ? clamped.line : seg.originalLine;
+        if (!map.has(line)) {
+          map.set(line, []);
         }
-        map.get(seg.originalLine)!.push(seg);
+        map.get(line)!.push(seg);
       }
     }
   }
@@ -142,13 +178,23 @@ const visibleLineSpans = computed<RenderSpan[][]>(() => {
     );
     for (let i = 0; i < mappingsOnLine.length; i++) {
       const seg = mappingsOnLine[i];
-      const startCol = props.side === "generated" ? seg.generatedColumn : seg.originalColumn;
-      const endCol =
-        i + 1 < mappingsOnLine.length
-          ? props.side === "generated"
-            ? mappingsOnLine[i + 1].generatedColumn
-            : mappingsOnLine[i + 1].originalColumn
-          : lineText.length;
+      let startCol: number;
+      let endCol: number;
+
+      if (props.side === "generated") {
+        startCol = seg.generatedColumn;
+        endCol =
+          i + 1 < mappingsOnLine.length ? mappingsOnLine[i + 1].generatedColumn : lineText.length;
+      } else {
+        const clamped = clampedPositionCache.value.get(seg);
+        startCol = clamped ? clamped.column : seg.originalColumn;
+        if (i + 1 < mappingsOnLine.length) {
+          const nextClamped = clampedPositionCache.value.get(mappingsOnLine[i + 1]);
+          endCol = nextClamped ? nextClamped.column : mappingsOnLine[i + 1].originalColumn;
+        } else {
+          endCol = lineText.length;
+        }
+      }
 
       for (let c = startCol; c < endCol && c < lineText.length; c++) {
         charMapping[c] = seg;
@@ -324,11 +370,19 @@ defineExpose({
 <template>
   <div
     ref="containerRef"
-    class="h-full overflow-auto font-mono text-sm bg-panel text-fg"
+    class="group relative h-full overflow-auto font-mono text-sm bg-panel text-fg"
     @scroll="onVirtualScroll"
     @mouseleave="handleMouseLeave"
     @click="handleClick"
   >
+    <button
+      class="absolute top-2 right-4 z-10 p-1.5 rounded bg-muted hover:bg-emphasis text-fg-muted hover:text-fg transition opacity-0 group-hover:opacity-100"
+      title="Copy code"
+      @click.stop="copyCode"
+    >
+      <IconCheckmark v-if="copied" class="w-4 h-4 text-green-500" />
+      <IconCopy v-else class="w-4 h-4" />
+    </button>
     <div :style="{ height: `${totalHeight}px`, position: 'relative' }">
       <div :style="{ transform: `translateY(${offsetY}px)` }">
         <div

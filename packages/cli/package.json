@@ -1,0 +1,25 @@
+{
+  "name": "source-map-viewer",
+  "version": "0.1.0",
+  "description": "Inspect and debug source map mappings from the terminal",
+  "bin": {
+    "source-map-viewer": "bin.js"
+  },
+  "files": [
+    "bin.js",
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "tsdown src/cli.ts --platform node --format esm --out-dir dist --external open --external source-map-js",
+    "release": "bumpp && pnpm build && npm publish"
+  },
+  "dependencies": {
+    "open": "^10.0.0",
+    "source-map-js": "^1.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsdown": "^0.12.0"
+  }
+}

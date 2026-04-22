@@ -63,7 +63,35 @@ export function useFileLoader() {
     throw new Error("Could not find a source map in the provided text.");
   }
 
+  function assertSafeUrl(input: string): void {
+    const parsed = new URL(input);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      throw new Error("Only HTTP(S) URLs are allowed");
+    }
+    const hostname = parsed.hostname.replace(/^\[|\]$/g, "");
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "0.0.0.0" ||
+      hostname === "::1" ||
+      hostname.startsWith("10.") ||
+      hostname.startsWith("192.168.") ||
+      hostname.startsWith("169.254.") ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+      hostname.startsWith("fc") ||
+      hostname.startsWith("fd") ||
+      hostname.startsWith("fe80") ||
+      hostname.startsWith("::ffff:127.") ||
+      hostname.startsWith("::ffff:10.") ||
+      hostname.startsWith("::ffff:192.168.") ||
+      hostname.startsWith("::ffff:169.254.")
+    ) {
+      throw new Error("Fetching private/internal addresses is not allowed");
+    }
+  }
+
   async function loadFromUrl(url: string): Promise<LoadedFiles> {
+    assertSafeUrl(url);
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
@@ -88,6 +116,7 @@ export function useFileLoader() {
     const sourceMapUrlMatch = text.match(/\/\/[#@]\s*sourceMappingURL=(\S+)/);
     if (sourceMapUrlMatch) {
       const mapUrl = new URL(sourceMapUrlMatch[1], url).href;
+      assertSafeUrl(mapUrl);
       const mapResponse = await fetch(mapUrl);
       if (mapResponse.ok) {
         const mapText = await mapResponse.text();
