@@ -3,7 +3,8 @@ import { upload } from "./upload.js";
 import { parseSourceMap } from "@core/parser.js";
 import { buildMappingIndex } from "@core/mapper.js";
 import { validateMappings } from "@core/validator.js";
-import { generateDebugPrompt } from "@core/prompt.js";
+import { generateDebugPrompt, analyzeQuality } from "@core/prompt.js";
+import { calculateStats } from "@core/stats.js";
 import { diffMappings } from "@core/diff.js";
 import { extractSnippet } from "@core/snippets.js";
 
@@ -224,6 +225,8 @@ async function main() {
     const mappingIndex = buildMappingIndex(parsedData.mappings);
     const diagnostics = validateMappings(parsedData);
     const badSegmentSet = new Set(diagnostics.map((d) => d.segment));
+    const stats = calculateStats(parsedData, generatedCode, diagnostics, mappingIndex);
+    const qualityWarnings = analyzeQuality(parsedData, generatedCode, stats.coveragePercent);
     const markdown = generateDebugPrompt({
       generatedCode,
       sourceMapJson,
@@ -231,6 +234,8 @@ async function main() {
       mappingIndex,
       diagnostics,
       badSegmentSet,
+      qualityWarnings,
+      coveragePercent: stats.coveragePercent,
     });
     process.stdout.write(markdown);
     if (copy) {
