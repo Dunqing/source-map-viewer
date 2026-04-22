@@ -23,15 +23,15 @@
     "@types/markdown-it": "^14.1.2",
     "@unocss/reset": "^66.6.8",
     "@vitejs/plugin-vue": "^6.0.6",
-    "@void/vue": "npm:@void-sdk/vue@^0.4.0",
+    "@void/vue": "npm:@void-sdk/vue@^0.5.0",
     "@vue/test-utils": "^2.4.6",
     "bumpp": "^11.0.1",
     "happy-dom": "^20.9.0",
     "unocss": "^66.6.8",
     "unplugin-icons": "^23.0.1",
-    "vite": "catalog:",
+    "vite": "npm:@voidzero-dev/vite-plus-core@^0.1.19",
     "vite-plus": "catalog:",
-    "vitest": "catalog:",
+    "vitest": "npm:@voidzero-dev/vite-plus-test@^0.1.19",
     "void": "npm:@void-sdk/void@^0.5.0"
   },
   "packageManager": "pnpm@10.33.0"
