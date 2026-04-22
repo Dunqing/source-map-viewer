@@ -1,6 +1,6 @@
 {
   "name": "source-map-viewer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Inspect and debug source map mappings from the terminal",
   "bin": {
     "source-map-viewer": "bin.js"
