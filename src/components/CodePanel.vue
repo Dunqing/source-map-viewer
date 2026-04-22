@@ -181,6 +181,9 @@ const visibleLineSpans = computed<RenderSpan[][]>(() => {
       { length: lineText.length },
       () => null,
     );
+    // Index of first non-whitespace char — used to avoid highlighting indentation
+    const firstCode = lineText.search(/\S/);
+
     for (let i = 0; i < mappingsOnLine.length; i++) {
       const seg = mappingsOnLine[i];
       let startCol: number;
@@ -190,6 +193,8 @@ const visibleLineSpans = computed<RenderSpan[][]>(() => {
         startCol = seg.generatedColumn;
         endCol =
           i + 1 < mappingsOnLine.length ? mappingsOnLine[i + 1].generatedColumn : lineText.length;
+        // Don't highlight leading whitespace
+        if (firstCode > 0 && startCol < firstCode) startCol = firstCode;
       } else {
         const clamped = clampedPositionCache.value.get(seg);
         startCol = clamped ? clamped.column : seg.originalColumn;
@@ -465,6 +470,10 @@ defineExpose({
 </template>
 
 <style scoped>
+.whitespace-pre {
+  tab-size: 2;
+}
+
 .unmapped-original {
   opacity: 0.35;
   transition: opacity 0.3s ease-in;
