@@ -14,6 +14,7 @@ const REAL_SOURCE_MAP = {
 
 const REAL_SOURCE_MAP_JSON = JSON.stringify(REAL_SOURCE_MAP);
 const REAL_GENERATED_CODE = "var x = 1;\nconsole.log(x);";
+const JS_SOURCE_MAP_DIRECTIVE = "//# source" + "MappingURL=";
 
 function createFile(name: string, content: string): File {
   return new File([content], name, { type: "text/plain" });
@@ -72,7 +73,7 @@ describe("useFileLoader end-to-end: load → parse → compress → decompress",
   });
 
   it("paste inline source map → full pipeline", async () => {
-    const inlineCode = `${REAL_GENERATED_CODE}\n//# sourceMappingURL=data:application/json;base64,${btoa(REAL_SOURCE_MAP_JSON)}\n`;
+    const inlineCode = `${REAL_GENERATED_CODE}\n${JS_SOURCE_MAP_DIRECTIVE}data:application/json;base64,${btoa(REAL_SOURCE_MAP_JSON)}\n`;
 
     const loaded = await loadFromText(inlineCode);
 
@@ -111,7 +112,7 @@ describe("useFileLoader end-to-end: load → parse → compress → decompress",
   });
 
   it("URL fetch (code + external .map) → full pipeline", async () => {
-    const codeWithMapRef = `${REAL_GENERATED_CODE}\n//# sourceMappingURL=bundle.js.map\n`;
+    const codeWithMapRef = `${REAL_GENERATED_CODE}\n${JS_SOURCE_MAP_DIRECTIVE}bundle.js.map\n`;
 
     globalThis.fetch = vi
       .fn()

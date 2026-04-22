@@ -10,13 +10,13 @@ const resolved = ref(false);
 const showVisualization = ref(false);
 let currentSlug = "";
 
-function getHashFromUrl(): string {
+function getSlugFromUrl(): string {
   const pathMatch = window.location.pathname.match(/^\/(.+)$/);
   return pathMatch ? pathMatch[1] : "";
 }
 
 async function handleNavigation() {
-  const slug = getHashFromUrl();
+  const slug = getSlugFromUrl();
   if (slug) {
     if (slug === currentSlug && store.parsedData) {
       // Same slug already loaded — skip redundant fetch
@@ -38,7 +38,7 @@ async function handleNavigation() {
     showVisualization.value = false;
   }
   resolved.value = true;
-  document.documentElement.classList.remove("has-hash");
+  document.documentElement.classList.remove("has-share-slug");
 }
 
 onMounted(() => {

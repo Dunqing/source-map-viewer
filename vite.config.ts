@@ -91,10 +91,10 @@ function unocssDevSSRInject(): Plugin {
             .then((result: { css: string }) => {
               let output = html;
               if (result.css) {
-                const hashHideRule = "html.has-hash #app{visibility:hidden}";
+                const shareSlugHideRule = "html.has-share-slug #app{visibility:hidden}";
                 output = html.replace(
                   "</head>",
-                  `<style>${resetCSS}\n${hashHideRule}\n${result.css}</style></head>`,
+                  `<style>${resetCSS}\n${shareSlugHideRule}\n${result.css}</style></head>`,
                 );
               }
               savedHeaders["content-length"] = String(Buffer.byteLength(output));

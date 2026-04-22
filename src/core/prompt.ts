@@ -1,5 +1,5 @@
 import type { MappingDiagnostic, MappingSegment, SourceMapData } from "./types";
-import { detectLanguage } from "../composables/useHighlighter";
+import { detectLanguage } from "./language";
 
 /** Escape markdown-structural characters in untrusted metadata strings. */
 export function escapeMarkdown(s: string): string {
@@ -88,6 +88,41 @@ export interface DebugPromptInput {
   visualizationUrl?: string;
 }
 
+function extractRawMappings(jsonString: string): string | null {
+  try {
+    const raw = JSON.parse(jsonString) as {
+      mappings?: unknown;
+      sections?: Array<{
+        offset?: { line?: unknown; column?: unknown };
+        map?: { mappings?: unknown };
+      }>;
+    };
+
+    if (typeof raw.mappings === "string") {
+      return raw.mappings;
+    }
+
+    if (!Array.isArray(raw.sections)) {
+      return null;
+    }
+
+    const sections = raw.sections
+      .map((section, index) => {
+        const mappings = section?.map?.mappings;
+        if (typeof mappings !== "string") return null;
+
+        const line = typeof section.offset?.line === "number" ? section.offset.line : "?";
+        const column = typeof section.offset?.column === "number" ? section.offset.column : "?";
+        return `# Section ${index + 1} @ ${line}:${column}\n${mappings}`;
+      })
+      .filter((section): section is string => section !== null);
+
+    return sections.length > 0 ? sections.join("\n\n") : null;
+  } catch {
+    return null;
+  }
+}
+
 export function generateDebugPrompt(input: DebugPromptInput): string {
   const {
     generatedCode,
@@ -106,6 +141,7 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
   const sources = parsedData.sources;
   const totalMappings = mappingIndex.length;
   const badCount = diagnostics.length;
+  const rawMappings = extractRawMappings(sourceMapJson);
 
   const numberedOrig = origLines.map((l, i) => `${String(i + 1).padStart(3)} | ${l}`).join("\n");
   const numberedGen = genLines.map((l, i) => `${String(i + 1).padStart(3)} | ${l}`).join("\n");
@@ -203,6 +239,7 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
     numberedGen,
     "```",
     "",
+    ...(rawMappings ? ["## Raw mappings (VLQ)", "", "```text", rawMappings, "```", ""] : []),
     `## Mapping table${mappingNote ? ` (${mappingNote})` : ` (${allMappings.length})`}`,
     "",
     "Generated → Original. Flags: ⚠️ invalid position, ⚡ maps to whitespace.",

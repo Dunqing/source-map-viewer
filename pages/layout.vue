@@ -45,8 +45,8 @@ const jsonLd = JSON.stringify({
           unmapped regions
         </li>
         <li>Coverage statistics showing mapped vs unmapped bytes per file</li>
-        <li>Three input modes: file upload (.js/.map/.css), paste, or URL fetch</li>
-        <li>Shareable URLs with compressed source map data in the hash</li>
+        <li>Three input modes: file upload (.js/.ts/.css/.map/.json), paste, or URL fetch</li>
+        <li>Shareable URLs with short IDs or inline compressed URL slugs</li>
       </ul>
       <p>This tool requires JavaScript to run. Please enable JavaScript in your browser.</p>
       <p>
@@ -62,9 +62,9 @@ body {
   background: var(--c-bg);
   color: var(--c-text);
 }
-/* Hide SSG-prerendered landing page when URL has a hash (shared link).
-   The head script adds .has-hash before paint. Vue removes it after mount. */
-html.has-hash #app {
+/* Hide the landing page before a shared-link slug resolves on the client.
+   The head script adds .has-share-slug before paint. Vue removes it after mount. */
+html.has-share-slug #app {
   visibility: hidden;
 }
 

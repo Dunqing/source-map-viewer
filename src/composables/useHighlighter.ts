@@ -8,16 +8,10 @@ import typescript from "shiki/langs/typescript.mjs";
 import css from "shiki/langs/css.mjs";
 import json from "shiki/langs/json.mjs";
 import { useTheme } from "./useTheme";
+import { detectLanguage } from "../core/language";
 
 const highlighter = shallowRef<HighlighterCore | null>(null);
 const loading = shallowRef(true);
-
-export function detectLanguage(filename: string): string {
-  if (filename.endsWith(".ts") || filename.endsWith(".tsx")) return "typescript";
-  if (filename.endsWith(".css") || filename.endsWith(".scss")) return "css";
-  if (filename.endsWith(".json") || filename.endsWith(".map")) return "json";
-  return "javascript";
-}
 
 export function useHighlighter() {
   const { resolvedTheme } = useTheme();

@@ -29,7 +29,7 @@ function shouldServeMarkdown(req: { header(name: string): string | undefined }):
   return false;
 }
 
-/** Short IDs are 8 alphanumeric chars. Long hashes are base64url compressed data. */
+/** Short IDs are 8 alphanumeric chars. Longer slugs embed compressed source-map data. */
 function isShortId(slug: string): boolean {
   return /^[A-Za-z0-9]{8}$/.test(slug);
 }
@@ -47,7 +47,7 @@ async function resolveData(
       return stored;
     }
   }
-  // Fall back to inline decompression for long hashes
+  // Fall back to inline decompression for longer slugs
   return decompressFromHash(slug);
 }
 

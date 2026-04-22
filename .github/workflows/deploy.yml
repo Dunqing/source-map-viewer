@@ -8,24 +8,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: voidzero-dev/setup-vp@v1
         with:
-          node-version: 22
-          cache: pnpm
-          registry-url: https://npm.pkg.github.com
-          scope: "@void-sdk"
-      - run: pnpm install
+          cache: true
+          run-install: false
+      - run: vp install
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-      - run: pnpm exec vp check
-      - run: pnpm exec vp test --run
-      # TODO: switch to `pnpm void deploy` (server mode) once the Cloudflare
-      # WfP asset corroboration bug is fixed (see docs/void-platform-issue.md).
-      # For now, override to static so pages get prerendered for SPA deploy.
-      - run: node -e "const f=require('fs');const c=JSON.parse(f.readFileSync('void.json'));c.output='static';f.writeFileSync('void.json',JSON.stringify(c,null,2))"
-      - run: pnpm exec vp build
-      - run: pnpm void deploy --dir dist/client --spa
+      - run: vp check
+      - run: vp test --run
+      - run: vp build
+      - run: vp exec void deploy --project source-map-viewer --skip-build
         env:
           VOID_TOKEN: ${{ secrets.VOID_TOKEN }}
-          VOID_PROJECT: source-map-viewer

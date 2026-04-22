@@ -101,7 +101,7 @@ function isShortId(slug: string): boolean {
   return /^[A-Za-z0-9]{8}$/.test(slug);
 }
 
-/** Resolve a slug (short ID or inline hash) to source map data, with localStorage caching. */
+/** Resolve a slug (short ID or inline compressed payload) to source map data. */
 export async function resolveSlug(slug: string): Promise<ShareableData | null> {
   const cached = getCached(slug);
   if (cached) return cached;

@@ -11,15 +11,14 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "tsdown src/cli.ts --platform node --format esm --out-dir dist --external open --external source-map-js",
-    "release": "bumpp && pnpm build && npm publish"
+    "build": "vp pack src/cli.ts --platform node --format esm --out-dir dist --deps.never-bundle open --deps.never-bundle source-map-js",
+    "release": "bumpp && vp run --filter source-map-viewer build && vp pm publish --no-git-checks"
   },
   "dependencies": {
     "open": "^10.0.0",
     "source-map-js": "^1.2.1"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "tsdown": "^0.12.0"
+    "@types/node": "^22.0.0"
   }
 }

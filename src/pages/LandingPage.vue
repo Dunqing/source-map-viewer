@@ -38,7 +38,7 @@ async function navigateWithData(generatedCode: string, sourceMapJson: string, la
   store.loadSourceMap(generatedCode, sourceMapJson);
   if (store.error) throw new Error(store.error);
 
-  // Create short URL via API, fall back to inline hash
+  // Create a short URL via API, fall back to an inline compressed slug.
   let path: string;
   try {
     const res = await fetch("/api/share", {
@@ -50,11 +50,11 @@ async function navigateWithData(generatedCode: string, sourceMapJson: string, la
     const { id } = await res.json();
     path = `/${id}`;
   } catch {
-    const hash = await compressToHash({ generatedCode, sourceMapJson });
-    path = `/${hash}`;
+    const slug = await compressToHash({ generatedCode, sourceMapJson });
+    path = `/${slug}`;
   }
 
-  addHistoryEntry({ label, hash: path.slice(1), timestamp: Date.now() });
+  addHistoryEntry({ label, slug: path.slice(1), timestamp: Date.now() });
   window.history.pushState(null, "", path);
   window.dispatchEvent(new CustomEvent("smv-navigate"));
 }
@@ -106,8 +106,8 @@ async function loadExample(source: ExampleSource, transformer: string) {
   await navigateWithData(data.generatedCode, data.sourceMapJson, `${source.name} · ${transformer}`);
 }
 
-function loadFromHistory(entry: { hash: string }) {
-  window.history.pushState(null, "", `/${entry.hash}`);
+function loadFromHistory(entry: { slug: string }) {
+  window.history.pushState(null, "", `/${entry.slug}`);
   window.dispatchEvent(new CustomEvent("smv-navigate"));
 }
 
@@ -170,9 +170,11 @@ function formatTimeAgo(timestamp: number): string {
         <p class="text-sm text-fg-muted mb-3">
           Drop your
           <code class="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">.js</code>
+          <code class="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">.ts</code>
           <code class="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">.css</code>
           or
           <code class="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">.map</code>
+          <code class="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">.json</code>
           files here
         </p>
         <div class="flex items-center justify-center gap-2">
@@ -272,7 +274,7 @@ function formatTimeAgo(timestamp: number): string {
         <div class="space-y-1">
           <button
             v-for="entry in historyEntries"
-            :key="entry.hash"
+            :key="entry.slug"
             class="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-edge bg-surface hover:bg-surface transition text-left"
             @click="loadFromHistory(entry)"
           >

@@ -2,19 +2,42 @@ import { ref, onMounted } from "vue";
 
 export interface HistoryEntry {
   label: string;
-  hash: string;
+  slug: string;
   timestamp: number;
 }
 
 const STORAGE_KEY = "smv-history";
 const MAX_ENTRIES = 5;
 
+function normalizeEntry(value: unknown): HistoryEntry | null {
+  if (typeof value !== "object" || value === null) return null;
+
+  const record = value as Record<string, unknown>;
+  const slug =
+    typeof record.slug === "string"
+      ? record.slug
+      : typeof record.hash === "string"
+        ? record.hash
+        : null;
+
+  if (typeof record.label !== "string" || slug === null || typeof record.timestamp !== "number") {
+    return null;
+  }
+
+  return {
+    label: record.label,
+    slug,
+    timestamp: record.timestamp,
+  };
+}
+
 function loadFromStorage(): HistoryEntry[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalizeEntry).filter((entry): entry is HistoryEntry => entry !== null);
   } catch {
     return [];
   }
@@ -36,7 +59,7 @@ export function useHistory() {
   });
 
   function addEntry(entry: HistoryEntry) {
-    const filtered = entries.value.filter((e) => e.hash !== entry.hash);
+    const filtered = entries.value.filter((e) => e.slug !== entry.slug);
     entries.value = [entry, ...filtered].slice(0, MAX_ENTRIES);
     saveToStorage(entries.value);
   }

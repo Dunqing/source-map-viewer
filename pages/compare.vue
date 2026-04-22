@@ -22,7 +22,7 @@ const error = ref<string | null>(null);
 const resolved = ref(false);
 
 onMounted(async () => {
-  document.documentElement.classList.remove("has-hash");
+  document.documentElement.classList.remove("has-share-slug");
 
   const params = new URLSearchParams(window.location.search);
   slugA.value = params.get("a");

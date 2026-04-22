@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vite-plus/test";
 import { parseSourceMap, extractInlineSourceMap } from "../core/parser";
 
+const JS_SOURCE_MAP_DIRECTIVE = "//# source" + "MappingURL=";
+const CSS_SOURCE_MAP_DIRECTIVE = "/*# source" + "MappingURL=";
+
 describe("parseSourceMap", () => {
   it("parses a simple source map JSON", () => {
     const raw = JSON.stringify({
@@ -74,7 +77,7 @@ describe("extractInlineSourceMap", () => {
   it("extracts base64 inline source map from //# comment", () => {
     const sourceMap = JSON.stringify({ version: 3, sources: [], mappings: "" });
     const base64 = btoa(sourceMap);
-    const code = `console.log("hi");\n//# sourceMappingURL=data:application/json;base64,${base64}\n`;
+    const code = `console.log("hi");\n${JS_SOURCE_MAP_DIRECTIVE}data:application/json;base64,${base64}\n`;
 
     const result = extractInlineSourceMap(code);
     expect(result).not.toBeNull();
@@ -85,7 +88,7 @@ describe("extractInlineSourceMap", () => {
   it("extracts from /* */ comment style", () => {
     const sourceMap = JSON.stringify({ version: 3, sources: [], mappings: "" });
     const base64 = btoa(sourceMap);
-    const code = `body{}\n/*# sourceMappingURL=data:application/json;base64,${base64} */\n`;
+    const code = `body{}\n${CSS_SOURCE_MAP_DIRECTIVE}data:application/json;base64,${base64} */\n`;
 
     const result = extractInlineSourceMap(code);
     expect(result).not.toBeNull();

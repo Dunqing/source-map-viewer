@@ -202,12 +202,12 @@ async function handleShare() {
     showToast("Short URL copied to clipboard");
   } catch {
     try {
-      // Fallback to inline hash URL
-      const hash = await compressToHash({
+      // Fall back to an inline compressed slug when the share API is unavailable.
+      const slug = await compressToHash({
         generatedCode: store.generatedCode,
         sourceMapJson: store.sourceMapJson,
       });
-      const url = `${window.location.origin}/${hash}`;
+      const url = `${window.location.origin}/${slug}`;
       await navigator.clipboard.writeText(url);
       showToast("URL copied to clipboard");
     } catch {

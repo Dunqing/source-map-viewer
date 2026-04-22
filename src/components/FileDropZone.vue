@@ -63,7 +63,7 @@ onUnmounted(() => {
     >
       <IconUpload class="w-10 h-10 text-blue-500 mb-2" />
       <p class="text-lg font-medium">Drop files here</p>
-      <p class="text-sm text-fg-muted">.js, .ts, .css, .map files</p>
+      <p class="text-sm text-fg-muted">.js, .ts, .css, .map, .json files</p>
     </div>
   </div>
 </template>

@@ -12,13 +12,15 @@ const VALID_SOURCE_MAP = {
 };
 
 const VALID_SOURCE_MAP_JSON = JSON.stringify(VALID_SOURCE_MAP);
+const JS_SOURCE_MAP_DIRECTIVE = "//# source" + "MappingURL=";
+const CSS_SOURCE_MAP_DIRECTIVE = "/*# source" + "MappingURL=";
 
 const GENERATED_CODE = `var x = 1;
 console.log(x);`;
 
 const GENERATED_CODE_WITH_INLINE = `var x = 1;
 console.log(x);
-//# sourceMappingURL=data:application/json;base64,${btoa(VALID_SOURCE_MAP_JSON)}
+${JS_SOURCE_MAP_DIRECTIVE}data:application/json;base64,${btoa(VALID_SOURCE_MAP_JSON)}
 `;
 
 // Helper to create a File object
@@ -152,7 +154,7 @@ describe("useFileLoader", () => {
     });
 
     it("handles CSS with inline source map", async () => {
-      const cssWithMap = `body { color: red; }\n/*# sourceMappingURL=data:application/json;base64,${btoa(VALID_SOURCE_MAP_JSON)} */\n`;
+      const cssWithMap = `body { color: red; }\n${CSS_SOURCE_MAP_DIRECTIVE}data:application/json;base64,${btoa(VALID_SOURCE_MAP_JSON)} */\n`;
 
       const result = await loadFromText(cssWithMap);
 
@@ -243,7 +245,7 @@ describe("useFileLoader", () => {
     });
 
     it("follows sourceMappingURL comment to fetch external map", async () => {
-      const codeWithExternalMap = `var x = 1;\nconsole.log(x);\n//# sourceMappingURL=bundle.js.map\n`;
+      const codeWithExternalMap = `var x = 1;\nconsole.log(x);\n${JS_SOURCE_MAP_DIRECTIVE}bundle.js.map\n`;
 
       globalThis.fetch = vi
         .fn()
@@ -268,7 +270,7 @@ describe("useFileLoader", () => {
     });
 
     it("handles absolute sourceMappingURL", async () => {
-      const codeWithAbsoluteMap = `var x = 1;\n//# sourceMappingURL=https://maps.example.com/bundle.js.map\n`;
+      const codeWithAbsoluteMap = `var x = 1;\n${JS_SOURCE_MAP_DIRECTIVE}https://maps.example.com/bundle.js.map\n`;
 
       globalThis.fetch = vi
         .fn()
@@ -312,7 +314,7 @@ describe("useFileLoader", () => {
     });
 
     it("throws when external map fetch fails", async () => {
-      const codeWithExternalMap = `var x = 1;\n//# sourceMappingURL=bundle.js.map\n`;
+      const codeWithExternalMap = `var x = 1;\n${JS_SOURCE_MAP_DIRECTIVE}bundle.js.map\n`;
 
       globalThis.fetch = vi
         .fn()
