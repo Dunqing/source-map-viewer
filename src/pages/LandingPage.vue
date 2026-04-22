@@ -330,15 +330,20 @@ function formatTimeAgo(timestamp: number): string {
         <div class="space-y-1.5 text-sm text-fg-muted">
           <div class="flex items-baseline gap-2">
             <IconArrowRight class="w-3 h-3 shrink-0 mt-0.5 text-fg-muted" />
-            <span>View generated and original code side by side</span>
+            <span>Load generated code and its source map from files, paste, URLs, or examples</span>
           </div>
           <div class="flex items-baseline gap-2">
             <IconArrowRight class="w-3 h-3 shrink-0 mt-0.5 text-fg-muted" />
-            <span>Hover any segment to trace its mapping across files</span>
+            <span
+              >Inspect original and generated code side by side with synchronized highlighting</span
+            >
           </div>
           <div class="flex items-baseline gap-2">
             <IconArrowRight class="w-3 h-3 shrink-0 mt-0.5 text-fg-muted" />
-            <span>Spot broken, missing, or suspicious mapping entries</span>
+            <span
+              >Hover or click a segment to trace mappings and catch broken or suspicious
+              entries</span
+            >
           </div>
         </div>
       </div>
