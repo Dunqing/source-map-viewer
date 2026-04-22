@@ -21,6 +21,10 @@ function markTokenSplitSegments(
   getColumn: (segment: MappingSegment) => number,
   getLineText: (segment: MappingSegment, line: number) => string | undefined,
   result: Set<MappingSegment>,
+  areGroupsAdjacent: (
+    previousGroup: MappingSegment[],
+    currentGroup: MappingSegment[],
+  ) => boolean = () => true,
 ) {
   let previousLine = -1;
   let previousGroup: MappingSegment[] | null = null;
@@ -43,6 +47,7 @@ function markTokenSplitSegments(
     if (
       previousGroup &&
       previousLine === line &&
+      areGroupsAdjacent(previousGroup, group) &&
       splitsIdentifierAt(getLineText(segment, line), column)
     ) {
       for (const previous of previousGroup) result.add(previous);
@@ -97,6 +102,30 @@ export function findTokenSplitSegments(
   const result = new Set<MappingSegment>();
   const generatedLines = generatedCode.split("\n");
   const sourceLines = data.sourcesContent.map((content) => content?.split("\n") ?? null);
+  const generatedOrder = new Map<MappingSegment, number>();
+
+  mappingIndex.forEach((segment, index) => {
+    generatedOrder.set(segment, index);
+  });
+
+  function areAdjacentInGeneratedOrder(
+    previousGroup: MappingSegment[],
+    currentGroup: MappingSegment[],
+  ): boolean {
+    return previousGroup.some((previous) =>
+      currentGroup.some((current) => {
+        const previousIndex = generatedOrder.get(previous);
+        const currentIndex = generatedOrder.get(current);
+        return (
+          previousIndex !== undefined &&
+          currentIndex !== undefined &&
+          current.generatedLine === previous.generatedLine &&
+          current.generatedColumn !== previous.generatedColumn &&
+          currentIndex === previousIndex + 1
+        );
+      }),
+    );
+  }
 
   markTokenSplitSegments(
     mappingIndex,
@@ -115,6 +144,7 @@ export function findTokenSplitSegments(
       (segment) => segment.originalColumn,
       (_segment, line) => lines[line],
       result,
+      areAdjacentInGeneratedOrder,
     );
   }
 

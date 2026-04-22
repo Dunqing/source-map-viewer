@@ -230,4 +230,29 @@ describe("buildVisibleGeneratedMappingIndex", () => {
 
     expect(visible).toEqual([mappings[1], mappings[2]]);
   });
+
+  it("preserves mappings that land on blank generated lines", () => {
+    const mappings = buildMappingIndex([
+      {
+        generatedLine: 0,
+        generatedColumn: 0,
+        originalLine: 0,
+        originalColumn: 0,
+        sourceIndex: 0,
+        nameIndex: null,
+      },
+      {
+        generatedLine: 1,
+        generatedColumn: 0,
+        originalLine: 1,
+        originalColumn: 0,
+        sourceIndex: 0,
+        nameIndex: null,
+      },
+    ]);
+
+    const visible = buildVisibleGeneratedMappingIndex(mappings, ["const a = 1;", ""]);
+
+    expect(visible).toEqual(mappings);
+  });
 });

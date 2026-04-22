@@ -300,4 +300,36 @@ describe("findTokenSplitSegments", () => {
 
     expect(result.size).toBe(0);
   });
+
+  it("does not flag original-side adjacent columns when the generated mappings are unrelated", () => {
+    const first = {
+      generatedLine: 0,
+      generatedColumn: 0,
+      originalLine: 0,
+      originalColumn: 0,
+      sourceIndex: 0,
+      nameIndex: null,
+    };
+    const second = {
+      generatedLine: 10,
+      generatedColumn: 0,
+      originalLine: 0,
+      originalColumn: 1,
+      sourceIndex: 0,
+      nameIndex: null,
+    };
+    const data = makeSourceMap({
+      sourcesContent: ["ab"],
+      mappings: [first, second],
+    });
+
+    const result = findTokenSplitSegments(
+      data,
+      Array.from({ length: 11 }, () => "x").join("\n"),
+      buildMappingIndex(data.mappings),
+      buildInverseMappingIndex(data.mappings),
+    );
+
+    expect(result.size).toBe(0);
+  });
 });

@@ -85,6 +85,12 @@ export function buildVisibleGeneratedMappingIndex(
 
     const mappingsOnLine = index.slice(start, end);
     const lineText = generatedLines[line] ?? "";
+    if (lineText.length === 0) {
+      visible.push(...mappingsOnLine);
+      start = end;
+      continue;
+    }
+
     if (lineText.length > 0) {
       const columns = mappingsOnLine.map((seg) => seg.generatedColumn);
       const charOwner: (MappingSegment | null)[] = Array.from(
