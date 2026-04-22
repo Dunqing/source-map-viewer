@@ -95,27 +95,36 @@ const isClamped = ref(false);
 let rafId = 0;
 let prevConnector: ConnectorData | null = null;
 
-/** Skip past leading whitespace so the connector box starts at actual code. */
-function skipIndent(code: string | undefined, line: number, col: number): number {
-  if (!code) return col;
-  const lineText = code.split("\n")[line];
+// Cached line splits — avoids re-splitting at 60fps in the rAF loop
+let cachedGenCode: string | undefined;
+let cachedGenLines: string[] = [];
+function getGenLines(): string[] {
+  const code = store.generatedCode;
+  if (code !== cachedGenCode) {
+    cachedGenCode = code;
+    cachedGenLines = code ? code.split("\n") : [];
+  }
+  return cachedGenLines;
+}
+
+function skipIndent(lines: string[], line: number, col: number): number {
+  const lineText = lines[line];
   if (!lineText) return col;
   const firstCode = lineText.search(/\S/);
-  if (firstCode < 0) return col; // all-whitespace line
+  if (firstCode < 0) return col;
   return Math.max(col, firstCode);
 }
 
 function calcConnector(seg: MappingSegment): ConnectorData | null {
   if (!props.originalPanel || !props.generatedPanel) return null;
 
-  // Use clamped positions for the original side to avoid pointing into empty space
   const sourceContent = store.parsedData?.sourcesContent[seg.sourceIndex];
   const sourceLines = sourceContent ? sourceContent.split("\n") : [];
+  const genLines = getGenLines();
   const clamped = clampOriginalPosition(seg.originalLine, seg.originalColumn, sourceLines);
 
-  // Skip leading whitespace so connector starts at actual code, not tabs/spaces
-  const origCol = skipIndent(sourceContent, clamped.line, clamped.column);
-  const genCol = skipIndent(store.generatedCode, seg.generatedLine, seg.generatedColumn);
+  const origCol = skipIndent(sourceLines, clamped.line, clamped.column);
+  const genCol = skipIndent(genLines, seg.generatedLine, seg.generatedColumn);
 
   const origPos = props.originalPanel.getViewportPosition(clamped.line, origCol);
   const genPos = props.generatedPanel.getViewportPosition(seg.generatedLine, genCol);
@@ -125,7 +134,6 @@ function calcConnector(seg: MappingSegment): ConnectorData | null {
   const genCharW = props.generatedPanel.getCharWidth();
   const endCols = getSegmentEndColumns(seg);
 
-  // Compute width using end positions to account for tabs
   const origEndCol = Math.min(endCols.orig, sourceLines[clamped.line]?.length ?? endCols.orig);
   const origEndPos = props.originalPanel.getViewportPosition(clamped.line, origEndCol);
   const genEndPos = props.generatedPanel.getViewportPosition(seg.generatedLine, endCols.gen);
@@ -240,6 +248,7 @@ watch(
     if (seg) {
       updateLoop();
     } else {
+      prevConnector = null;
       connector.value = null;
       curvePath.value = "";
       isClamped.value = false;
@@ -273,6 +282,7 @@ onUnmounted(() => cancelAnimationFrame(rafId));
         stroke-linecap="round"
         stroke-linejoin="round"
         :stroke-dasharray="isClamped ? '4 3' : 'none'"
+        style="transition: d 150ms ease-out"
       />
     </svg>
   </Teleport>

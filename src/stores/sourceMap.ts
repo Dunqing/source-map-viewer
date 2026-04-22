@@ -71,6 +71,8 @@ function createSourceMapStore() {
       inverseMappingIndex.value = buildInverseMappingIndex(data.mappings);
       diagnostics.value = validateMappings(data);
       stats.value = calculateStats(data, code, diagnostics.value, mappingIndex.value);
+      // Warm clampedSegmentSet eagerly so the first hover doesn't stall
+      void clampedSegmentSet.value;
       activeSourceIndex.value = 0;
       hoveredSegment.value = null;
     } catch (e) {

@@ -53,8 +53,13 @@ const {
   endLine,
   offsetY,
   totalHeight,
-  onScroll: onVirtualScroll,
+  onScroll: onVirtualScrollRaw,
 } = useVirtualScroll(totalLines, containerHeight);
+
+function onVirtualScroll(e: Event) {
+  onVirtualScrollRaw(e);
+  positionCache.clear();
+}
 
 const allTokens = computed<ThemedToken[][]>(() => {
   if (!props.code) return [];
@@ -322,19 +327,29 @@ onUnmounted(() => {
   resizeObserver?.disconnect();
 });
 
+// Position cache — cleared on scroll to avoid stale values in the rAF loop
+const positionCache = new Map<string, { x: number; y: number; top: number; height: number }>();
+
+function clearPositionCache() {
+  positionCache.clear();
+}
+
 function getViewportPosition(
   line: number,
   column: number,
 ): { x: number; y: number; top: number; height: number } | null {
   if (!containerRef.value) return null;
 
+  const key = `${line}:${column}`;
+  const cached = positionCache.get(key);
+  if (cached) return cached;
+
   const lineEl = containerRef.value.querySelector(`[data-line="${line}"]`) as HTMLElement | null;
   if (!lineEl) return null;
 
   const lineRect = lineEl.getBoundingClientRect();
 
-  // Walk text nodes in the code area to find the exact pixel position.
-  // This correctly handles tabs and any variable-width rendering.
+  // Walk text nodes to find exact pixel position (handles tabs correctly)
   const codeSpans = lineEl.querySelectorAll("span.whitespace-pre > span");
   let remaining = column;
   for (const span of codeSpans) {
@@ -346,7 +361,9 @@ function getViewportPosition(
       range.setStart(textNode, remaining);
       range.setEnd(textNode, Math.min(remaining + 1, len));
       const r = range.getBoundingClientRect();
-      return { x: r.left, y: lineRect.bottom, top: lineRect.top, height: lineRect.height };
+      const result = { x: r.left, y: lineRect.bottom, top: lineRect.top, height: lineRect.height };
+      positionCache.set(key, result);
+      return result;
     }
     remaining -= len;
   }
@@ -354,7 +371,14 @@ function getViewportPosition(
   // Fallback: simple charWidth calculation
   const charWidth = getCharWidth();
   const x = LINE_NUMBER_WIDTH + column * charWidth;
-  return { x: lineRect.left + x, y: lineRect.bottom, top: lineRect.top, height: lineRect.height };
+  const result = {
+    x: lineRect.left + x,
+    y: lineRect.bottom,
+    top: lineRect.top,
+    height: lineRect.height,
+  };
+  positionCache.set(key, result);
+  return result;
 }
 
 let cachedCharWidth = 0;
