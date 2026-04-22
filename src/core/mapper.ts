@@ -91,27 +91,25 @@ export function buildVisibleGeneratedMappingIndex(
       continue;
     }
 
-    if (lineText.length > 0) {
-      const columns = mappingsOnLine.map((seg) => seg.generatedColumn);
-      const charOwner: (MappingSegment | null)[] = Array.from(
-        { length: lineText.length },
-        () => null,
-      );
+    const columns = mappingsOnLine.map((seg) => seg.generatedColumn);
+    const charOwner: (MappingSegment | null)[] = Array.from(
+      { length: lineText.length },
+      () => null,
+    );
 
-      for (let i = 0; i < mappingsOnLine.length; i++) {
-        const seg = mappingsOnLine[i];
-        const { start: startCol, end: endCol } = getRenderedColumnRange(columns, i, lineText, {
-          skipIndent: true,
-        });
-        for (let c = startCol; c < endCol && c < lineText.length; c++) {
-          charOwner[c] = seg;
-        }
+    for (let i = 0; i < mappingsOnLine.length; i++) {
+      const seg = mappingsOnLine[i];
+      const { start: startCol, end: endCol } = getRenderedColumnRange(columns, i, lineText, {
+        skipIndent: true,
+      });
+      for (let c = startCol; c < endCol && c < lineText.length; c++) {
+        charOwner[c] = seg;
       }
+    }
 
-      const owners = new Set(charOwner.filter((seg): seg is MappingSegment => seg !== null));
-      for (const seg of mappingsOnLine) {
-        if (owners.has(seg)) visible.push(seg);
-      }
+    const owners = new Set(charOwner.filter((seg): seg is MappingSegment => seg !== null));
+    for (const seg of mappingsOnLine) {
+      if (owners.has(seg)) visible.push(seg);
     }
 
     start = end;

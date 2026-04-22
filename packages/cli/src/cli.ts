@@ -10,7 +10,7 @@ import { findTokenSplitSegments, validateMappings } from "@core/validator.js";
 import { generateDebugPrompt, analyzeQuality } from "@core/prompt.js";
 import { calculateStats } from "@core/stats.js";
 import { diffMappings } from "@core/diff.js";
-import { extractSnippet } from "@core/snippets.js";
+import { extractGeneratedSnippet, extractOriginalSnippet } from "@core/snippets.js";
 
 const HELP_TEXT = `
 source-map-viewer — Inspect and debug source map mappings
@@ -113,7 +113,7 @@ function formatDiffMarkdown(
     const allLines = side === "a" ? origLinesA : origLinesB;
     const sourceLines = allLines[seg.sourceIndex] ?? [];
     const src = (side === "a" ? parsedA : parsedB).sources[seg.sourceIndex] ?? "?";
-    const code = extractSnippet(sourceLines, seg.originalLine, seg.originalColumn);
+    const code = extractOriginalSnippet(sourceLines, seg.originalLine, seg.originalColumn);
     return `${src} ${seg.originalLine + 1}:${seg.originalColumn} \`${code}\``;
   }
 
@@ -141,7 +141,7 @@ function formatDiffMarkdown(
       if (entry.status === "same") continue;
       const seg = entry.a ?? entry.b!;
       const gen = `${seg.generatedLine + 1}:${seg.generatedColumn}`;
-      const genCode = extractSnippet(
+      const genCode = extractGeneratedSnippet(
         entry.a ? genLinesA : genLinesB,
         seg.generatedLine,
         seg.generatedColumn,

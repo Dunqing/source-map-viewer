@@ -27,9 +27,20 @@ const filteredEntries = computed(() =>
   showSame.value ? props.entries : props.entries.filter((e) => e.status !== "same"),
 );
 
+function segmentKey(seg: MappingSegment | null): string {
+  if (!seg) return "none";
+  return [
+    seg.generatedLine,
+    seg.generatedColumn,
+    seg.originalLine,
+    seg.originalColumn,
+    seg.sourceIndex,
+    seg.nameIndex ?? "null",
+  ].join(":");
+}
+
 function entryKey(entry: DiffEntry): string {
-  const seg = entry.a ?? entry.b!;
-  return `${seg.generatedLine}:${seg.generatedColumn}:${entry.status}`;
+  return `${entry.status}:${segmentKey(entry.a)}:${segmentKey(entry.b)}`;
 }
 
 function toggleExpand(key: string) {
@@ -108,11 +119,6 @@ function originalSourceName(entry: DiffEntry, side: "a" | "b"): string {
     const otherSources = otherSide === "a" ? props.sourcesA : props.sourcesB;
     return otherSources[otherSeg.sourceIndex] ?? "";
   }
-  const sources = side === "a" ? props.sourcesA : props.sourcesB;
-  return sources[seg.sourceIndex] ?? `#${seg.sourceIndex}`;
-}
-
-function sourceNameForSegment(seg: MappingSegment, side: "a" | "b"): string {
   const sources = side === "a" ? props.sourcesA : props.sourcesB;
   return sources[seg.sourceIndex] ?? `#${seg.sourceIndex}`;
 }
