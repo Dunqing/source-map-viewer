@@ -52,11 +52,19 @@ function getSegmentEndColumns(seg: MappingSegment): { orig: number; gen: number 
       }
     }
 
-    if (idx >= 0 && idx + 1 < segments.length) {
-      const next = segments[idx + 1];
-      const nextLine = side === "generated" ? next.generatedLine : next.originalLine;
-      const nextCol = side === "generated" ? next.generatedColumn : next.originalColumn;
-      if (nextLine === line) return nextCol;
+    if (idx >= 0) {
+      // Skip past any duplicate segments at the same position
+      let nextIdx = idx + 1;
+      while (nextIdx < segments.length) {
+        const next = segments[nextIdx];
+        const nextLine = side === "generated" ? next.generatedLine : next.originalLine;
+        const nextCol = side === "generated" ? next.generatedColumn : next.originalColumn;
+        if (nextLine !== line || nextCol !== col) {
+          if (nextLine === line) return nextCol;
+          break;
+        }
+        nextIdx++;
+      }
     }
 
     // Fallback: end of line
@@ -87,40 +95,14 @@ const isClamped = ref(false);
 let rafId = 0;
 let prevConnector: ConnectorData | null = null;
 
-/**
- * Compute the visual column of the first non-whitespace character,
- * accounting for tabs (rendered at 8-space tab stops in `whitespace: pre`).
- * Returns the original column if it's already past the indentation.
- */
-function visualColSkippingIndent(code: string | undefined, line: number, col: number): number {
+/** Skip past leading whitespace so the connector box starts at actual code. */
+function skipIndent(code: string | undefined, line: number, col: number): number {
   if (!code) return col;
   const lineText = code.split("\n")[line];
   if (!lineText) return col;
   const firstCode = lineText.search(/\S/);
   if (firstCode < 0) return col; // all-whitespace line
-
-  // Calculate visual width of the indentation
-  let visualIndent = 0;
-  for (let i = 0; i < firstCode; i++) {
-    if (lineText[i] === "\t") {
-      // Tab stop at multiples of 8 (CSS default tab-size)
-      visualIndent = Math.ceil((visualIndent + 1) / 8) * 8;
-    } else {
-      visualIndent++;
-    }
-  }
-
-  // Also calculate visual column for the requested col
-  let visualCol = 0;
-  for (let i = 0; i < Math.min(col, lineText.length); i++) {
-    if (lineText[i] === "\t") {
-      visualCol = Math.ceil((visualCol + 1) / 8) * 8;
-    } else {
-      visualCol++;
-    }
-  }
-
-  return Math.max(visualCol, visualIndent);
+  return Math.max(col, firstCode);
 }
 
 function calcConnector(seg: MappingSegment): ConnectorData | null {
@@ -132,27 +114,23 @@ function calcConnector(seg: MappingSegment): ConnectorData | null {
   const clamped = clampOriginalPosition(seg.originalLine, seg.originalColumn, sourceLines);
 
   // Skip leading whitespace so connector starts at actual code, not tabs/spaces
-  const origVisualCol = visualColSkippingIndent(sourceContent, clamped.line, clamped.column);
-  const genVisualCol = visualColSkippingIndent(
-    store.generatedCode,
-    seg.generatedLine,
-    seg.generatedColumn,
-  );
+  const origCol = skipIndent(sourceContent, clamped.line, clamped.column);
+  const genCol = skipIndent(store.generatedCode, seg.generatedLine, seg.generatedColumn);
 
-  const origPos = props.originalPanel.getViewportPosition(clamped.line, origVisualCol);
-  const genPos = props.generatedPanel.getViewportPosition(seg.generatedLine, genVisualCol);
+  const origPos = props.originalPanel.getViewportPosition(clamped.line, origCol);
+  const genPos = props.generatedPanel.getViewportPosition(seg.generatedLine, genCol);
   if (!origPos || !genPos) return null;
 
   const origCharW = props.originalPanel.getCharWidth();
   const genCharW = props.generatedPanel.getCharWidth();
   const endCols = getSegmentEndColumns(seg);
 
-  // Convert end columns to visual columns for correct width
+  // Compute width using end positions to account for tabs
   const origEndCol = Math.min(endCols.orig, sourceLines[clamped.line]?.length ?? endCols.orig);
-  const origEndVisual = visualColSkippingIndent(sourceContent, clamped.line, origEndCol);
-  const genEndVisual = visualColSkippingIndent(store.generatedCode, seg.generatedLine, endCols.gen);
-  const origWidth = Math.max(origCharW, (origEndVisual - origVisualCol) * origCharW);
-  const genWidth = Math.max(genCharW, (genEndVisual - genVisualCol) * genCharW);
+  const origEndPos = props.originalPanel.getViewportPosition(clamped.line, origEndCol);
+  const genEndPos = props.generatedPanel.getViewportPosition(seg.generatedLine, endCols.gen);
+  const origWidth = Math.max(origCharW, origEndPos ? origEndPos.x - origPos.x : origCharW);
+  const genWidth = Math.max(genCharW, genEndPos ? genEndPos.x - genPos.x : genCharW);
 
   return {
     origBox: { x: origPos.x, y: origPos.top, w: origWidth, h: origPos.height },

@@ -332,15 +332,29 @@ function getViewportPosition(
   if (!lineEl) return null;
 
   const lineRect = lineEl.getBoundingClientRect();
+
+  // Walk text nodes in the code area to find the exact pixel position.
+  // This correctly handles tabs and any variable-width rendering.
+  const codeSpans = lineEl.querySelectorAll("span.whitespace-pre > span");
+  let remaining = column;
+  for (const span of codeSpans) {
+    const textNode = span.firstChild;
+    if (!textNode || textNode.nodeType !== Node.TEXT_NODE) continue;
+    const len = textNode.textContent!.length;
+    if (remaining <= len) {
+      const range = document.createRange();
+      range.setStart(textNode, remaining);
+      range.setEnd(textNode, Math.min(remaining + 1, len));
+      const r = range.getBoundingClientRect();
+      return { x: r.left, y: lineRect.bottom, top: lineRect.top, height: lineRect.height };
+    }
+    remaining -= len;
+  }
+
+  // Fallback: simple charWidth calculation
   const charWidth = getCharWidth();
   const x = LINE_NUMBER_WIDTH + column * charWidth;
-
-  return {
-    x: lineRect.left + x,
-    y: lineRect.bottom,
-    top: lineRect.top,
-    height: lineRect.height,
-  };
+  return { x: lineRect.left + x, y: lineRect.bottom, top: lineRect.top, height: lineRect.height };
 }
 
 let cachedCharWidth = 0;

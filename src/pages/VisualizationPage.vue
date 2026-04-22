@@ -21,6 +21,7 @@ useTheme();
 
 const showStats = ref(false);
 const showMappings = ref(false);
+const selectedSegIndex = ref<number | null>(null);
 // Defer heavy rendering to avoid recursive update loops during mount.
 // First render is an empty shell; content appears after mount settles.
 const ready = ref(false);
@@ -31,11 +32,12 @@ onMounted(() => {
   // Restore UI state from URL params (client-only)
   const params = new URLSearchParams(window.location.search);
   showStats.value = params.get("stats") === "1";
-  showMappings.value = params.get("mappings") === "1";
   const initialTab = Number(params.get("tab"));
   if (initialTab > 0) store.setActiveSource(initialTab);
 
   const segParam = params.get("seg");
+  // seg implies mappings panel open
+  if (segParam != null) showMappings.value = true;
 
   // Show content after mount cascade settles
   requestAnimationFrame(() => {
@@ -47,12 +49,11 @@ onMounted(() => {
       requestAnimationFrame(() => {
         const segToSelect = store.mappingIndex[initialSeg];
         store.setHoveredSegment(segToSelect);
+        selectedSegIndex.value = initialSeg;
         store.setActiveSource(segToSelect.sourceIndex);
         originalPanelRef.value?.scrollToLine(segToSelect.originalLine);
         generatedPanelRef.value?.scrollToLine(segToSelect.generatedLine);
-        if (showMappings.value) {
-          mappingsPanelRef.value?.scrollToHovered();
-        }
+        mappingsPanelRef.value?.scrollToHovered();
       });
     }
 
@@ -69,22 +70,15 @@ function syncUrlParams() {
   urlSyncTimer = window.setTimeout(() => {
     const p = new URLSearchParams();
     if (store.activeSourceIndex > 0) p.set("tab", String(store.activeSourceIndex));
-    if (showMappings.value) p.set("mappings", "1");
     if (showStats.value) p.set("stats", "1");
-    if (store.hoveredSegment) {
-      const idx = store.mappingIndex.indexOf(store.hoveredSegment);
-      if (idx >= 0) p.set("seg", String(idx));
-    }
+    if (selectedSegIndex.value != null) p.set("seg", String(selectedSegIndex.value));
     const search = p.toString();
     const newUrl = `${window.location.pathname}${search ? "?" + search : ""}`;
     window.history.replaceState(null, "", newUrl);
   }, 16);
 }
 
-watch(
-  [showMappings, showStats, () => store.activeSourceIndex, () => store.hoveredSegment],
-  syncUrlParams,
-);
+watch([showMappings, showStats, () => store.activeSourceIndex, selectedSegIndex], syncUrlParams);
 const showAiDebug = ref(false);
 const showSearch = ref(false);
 const searchQuery = ref("");
@@ -132,8 +126,14 @@ function handleBack() {
   window.dispatchEvent(new CustomEvent("smv-navigate"));
 }
 
+function selectSegment(segment: MappingSegment) {
+  const idx = store.mappingIndex.indexOf(segment);
+  selectedSegIndex.value = idx >= 0 ? idx : null;
+}
+
 function handleOriginalSegmentClick(segment: MappingSegment) {
   store.setHoveredSegment(segment);
+  selectSegment(segment);
   if (generatedPanelRef.value) {
     generatedPanelRef.value.scrollToLine(segment.generatedLine);
   }
@@ -144,6 +144,7 @@ function handleOriginalSegmentClick(segment: MappingSegment) {
 
 function handleGeneratedSegmentClick(segment: MappingSegment) {
   store.setHoveredSegment(segment);
+  selectSegment(segment);
   store.setActiveSource(segment.sourceIndex);
   if (originalPanelRef.value) {
     originalPanelRef.value.scrollToLine(segment.originalLine);
@@ -155,6 +156,7 @@ function handleGeneratedSegmentClick(segment: MappingSegment) {
 
 function handleMappingClick(segment: MappingSegment) {
   store.setHoveredSegment(segment);
+  selectSegment(segment);
   store.setActiveSource(segment.sourceIndex);
   if (originalPanelRef.value) {
     originalPanelRef.value.scrollToLine(segment.originalLine);
