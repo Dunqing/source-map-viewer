@@ -1,7 +1,11 @@
 import { resolveFile } from "./resolve.js";
 import { upload } from "./upload.js";
 import { parseSourceMap } from "@core/parser.js";
-import { buildInverseMappingIndex, buildMappingIndex } from "@core/mapper.js";
+import {
+  buildInverseMappingIndex,
+  buildMappingIndex,
+  buildVisibleGeneratedMappingIndex,
+} from "@core/mapper.js";
 import { findTokenSplitSegments, validateMappings } from "@core/validator.js";
 import { generateDebugPrompt, analyzeQuality } from "@core/prompt.js";
 import { calculateStats } from "@core/stats.js";
@@ -83,14 +87,25 @@ function formatDiffMarkdown(
   const parsedB = parseSourceMap(b.sourceMapJson);
   const indexA = buildMappingIndex(parsedA.mappings);
   const indexB = buildMappingIndex(parsedB.mappings);
-  const diagA = validateMappings(parsedA);
-  const diagB = validateMappings(parsedB);
-  const { entries, summary } = diffMappings(indexA, indexB);
-
   const genLinesA = a.generatedCode.split("\n");
   const genLinesB = b.generatedCode.split("\n");
+  const compareIndexA = buildVisibleGeneratedMappingIndex(indexA, genLinesA);
+  const compareIndexB = buildVisibleGeneratedMappingIndex(indexB, genLinesB);
+  const diagA = validateMappings(parsedA);
+  const diagB = validateMappings(parsedB);
+  const { entries, summary } = diffMappings(compareIndexA, compareIndexB, {
+    sourcesA: parsedA.sources,
+    sourcesB: parsedB.sources,
+  });
+
   const origLinesA = parsedA.sourcesContent.map((c) => (c ?? "").split("\n"));
   const origLinesB = parsedB.sourcesContent.map((c) => (c ?? "").split("\n"));
+
+  function compareCountLabel(visibleCount: number, rawCount: number): string {
+    return visibleCount === rawCount
+      ? `${visibleCount} mappings`
+      : `${visibleCount} compared, ${rawCount} raw`;
+  }
 
   function origSnippet(entry: (typeof entries)[0], side: "a" | "b"): string {
     const seg = entry[side];
@@ -105,8 +120,8 @@ function formatDiffMarkdown(
   const lines = [
     "# Source Map Diff Report",
     "",
-    `**A:** ${a.label} (${indexA.length} mappings, ${diagA.length} bad)`,
-    `**B:** ${b.label} (${indexB.length} mappings, ${diagB.length} bad)`,
+    `**A:** ${a.label} (${compareCountLabel(compareIndexA.length, indexA.length)}, ${diagA.length} bad)`,
+    `**B:** ${b.label} (${compareCountLabel(compareIndexB.length, indexB.length)}, ${diagB.length} bad)`,
     "",
     "## Summary",
     "",

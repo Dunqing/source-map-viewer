@@ -69,6 +69,51 @@ export function buildMappingIndex(segments: MappingSegment[]): MappingIndex {
   });
 }
 
+export function buildVisibleGeneratedMappingIndex(
+  index: MappingIndex,
+  generatedLines: string[],
+): MappingIndex {
+  const visible: MappingSegment[] = [];
+
+  let start = 0;
+  while (start < index.length) {
+    const line = index[start].generatedLine;
+    let end = start + 1;
+    while (end < index.length && index[end].generatedLine === line) {
+      end++;
+    }
+
+    const mappingsOnLine = index.slice(start, end);
+    const lineText = generatedLines[line] ?? "";
+    if (lineText.length > 0) {
+      const columns = mappingsOnLine.map((seg) => seg.generatedColumn);
+      const charOwner: (MappingSegment | null)[] = Array.from(
+        { length: lineText.length },
+        () => null,
+      );
+
+      for (let i = 0; i < mappingsOnLine.length; i++) {
+        const seg = mappingsOnLine[i];
+        const { start: startCol, end: endCol } = getRenderedColumnRange(columns, i, lineText, {
+          skipIndent: true,
+        });
+        for (let c = startCol; c < endCol && c < lineText.length; c++) {
+          charOwner[c] = seg;
+        }
+      }
+
+      const owners = new Set(charOwner.filter((seg): seg is MappingSegment => seg !== null));
+      for (const seg of mappingsOnLine) {
+        if (owners.has(seg)) visible.push(seg);
+      }
+    }
+
+    start = end;
+  }
+
+  return visible;
+}
+
 export function buildInverseMappingIndex(segments: MappingSegment[]): InverseMappingIndex {
   const index: InverseMappingIndex = new Map();
 

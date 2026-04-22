@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vite-plus/test";
-import { diffMappings } from "../core/diff";
+import {
+  diffMappings,
+  findExactMappingInSameSource,
+  findNearestMappingInSameSource,
+} from "../core/diff";
 import type { MappingSegment } from "../core/types";
 
 function seg(
@@ -51,6 +55,37 @@ describe("diffMappings", () => {
     expect(result.entries[0].status).toBe("changed");
     expect(result.entries[0].a).toEqual(a[0]);
     expect(result.entries[0].b).toEqual(b[0]);
+  });
+
+  it("detects changed mapping when generated position differs but original position stays the same", () => {
+    const a = [seg(0, 0, 1, 0), seg(1, 0, 2, 0)];
+    const b = [seg(0, 2, 1, 0), seg(1, 4, 2, 0)];
+    const result = diffMappings(a, b);
+
+    expect(result.summary).toEqual({
+      same: 0,
+      changed: 2,
+      removed: 0,
+      added: 0,
+    });
+    expect(result.entries.map((entry) => entry.status)).toEqual(["changed", "changed"]);
+  });
+
+  it("matches source identities by source name instead of source index when compare sources are reordered", () => {
+    const a = [seg(0, 0, 1, 0, 0)];
+    const b = [seg(0, 2, 1, 0, 1)];
+    const result = diffMappings(a, b, {
+      sourcesA: ["a.ts", "b.ts"],
+      sourcesB: ["b.ts", "a.ts"],
+    });
+
+    expect(result.summary).toEqual({
+      same: 0,
+      changed: 1,
+      removed: 0,
+      added: 0,
+    });
+    expect(result.entries[0].status).toBe("changed");
   });
 
   it("detects removed mapping present in A but not B", () => {
@@ -134,5 +169,37 @@ describe("diffMappings", () => {
     expect(result.entries[1].status).toBe("changed"); // 0:5
     expect(result.entries[2].status).toBe("removed"); // 1:0
     expect(result.entries[3].status).toBe("added"); // 2:0
+  });
+
+  it("pairs generated shifts before reporting removed and added mappings", () => {
+    const a = [seg(2, 0, 2, 2), seg(3, 0, 3, 4), seg(38, 1, 48, 2)];
+    const b = [seg(2, 2, 2, 2), seg(3, 4, 3, 4)];
+
+    const result = diffMappings(a, b);
+
+    expect(result.summary).toEqual({
+      same: 0,
+      changed: 2,
+      removed: 1,
+      added: 0,
+    });
+  });
+
+  it("finds an exact raw counterpart even when compare-visible mappings might hide it", () => {
+    const target = seg(33, 2, 39, 2);
+    const rawCandidates = [target, seg(33, 6, 39, 6)];
+
+    expect(findExactMappingInSameSource(target, ["test.ts"], rawCandidates, ["test.ts"])).toEqual(
+      target,
+    );
+  });
+
+  it("does not pick a nearest mapping from another source file", () => {
+    const target = seg(33, 2, 39, 2, 0);
+    const otherSourceCandidate = seg(33, 2, 39, 2, 1);
+
+    expect(
+      findNearestMappingInSameSource(target, ["a.ts"], [otherSourceCandidate], ["b.ts", "c.ts"]),
+    ).toBeNull();
   });
 });

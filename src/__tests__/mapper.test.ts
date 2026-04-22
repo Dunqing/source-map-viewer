@@ -2,6 +2,7 @@ import { describe, it, expect } from "vite-plus/test";
 import {
   buildMappingIndex,
   buildInverseMappingIndex,
+  buildVisibleGeneratedMappingIndex,
   findMappingForGenerated,
   findMappingsForOriginal,
   clampOriginalPosition,
@@ -193,5 +194,40 @@ describe("getRenderedColumnRange", () => {
 
     expect(getRenderedColumnRange(columns, 0, lineText)).toEqual({ start: 0, end: 2 });
     expect(getRenderedColumnRange(columns, 1, lineText)).toEqual({ start: 2, end: 9 });
+  });
+});
+
+describe("buildVisibleGeneratedMappingIndex", () => {
+  it("drops generated mappings hidden by a later mapping at the same rendered start", () => {
+    const mappings = buildMappingIndex([
+      {
+        generatedLine: 0,
+        generatedColumn: 2,
+        originalLine: 53,
+        originalColumn: 2,
+        sourceIndex: 0,
+        nameIndex: null,
+      },
+      {
+        generatedLine: 0,
+        generatedColumn: 2,
+        originalLine: 54,
+        originalColumn: 2,
+        sourceIndex: 0,
+        nameIndex: null,
+      },
+      {
+        generatedLine: 0,
+        generatedColumn: 13,
+        originalLine: 54,
+        originalColumn: 21,
+        sourceIndex: 0,
+        nameIndex: null,
+      },
+    ]);
+
+    const visible = buildVisibleGeneratedMappingIndex(mappings, ["  toString() {"]);
+
+    expect(visible).toEqual([mappings[1], mappings[2]]);
   });
 });

@@ -17,6 +17,7 @@ const entryA = ref<CompareEntry | null>(null);
 const entryB = ref<CompareEntry | null>(null);
 const prefilledA = ref<CompareEntry | null>(null);
 const slugA = ref<string | null>(null);
+const slugB = ref<string | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const resolved = ref(false);
@@ -26,9 +27,9 @@ onMounted(async () => {
 
   const params = new URLSearchParams(window.location.search);
   slugA.value = params.get("a");
-  const slugB = params.get("b");
+  slugB.value = params.get("b");
 
-  if (!slugA.value && !slugB) {
+  if (!slugA.value && !slugB.value) {
     resolved.value = true;
     return;
   }
@@ -37,20 +38,23 @@ onMounted(async () => {
   error.value = null;
 
   try {
-    if (slugA.value && slugB) {
-      const [dataA, dataB] = await Promise.all([resolveSlug(slugA.value), resolveSlug(slugB)]);
+    if (slugA.value && slugB.value) {
+      const [dataA, dataB] = await Promise.all([
+        resolveSlug(slugA.value),
+        resolveSlug(slugB.value),
+      ]);
 
       if (!dataA) {
         error.value = `Failed to load source map A (${slugA.value})`;
         return;
       }
       if (!dataB) {
-        error.value = `Failed to load source map B (${slugB})`;
+        error.value = `Failed to load source map B (${slugB.value})`;
         return;
       }
 
       entryA.value = { ...dataA, label: `A (${slugA.value.slice(0, 8)}...)` };
-      entryB.value = { ...dataB, label: `B (${slugB.slice(0, 8)}...)` };
+      entryB.value = { ...dataB, label: `B (${slugB.value.slice(0, 8)}...)` };
     } else if (slugA.value) {
       const dataA = await resolveSlug(slugA.value);
       if (!dataA) {
@@ -97,7 +101,13 @@ function handleCompare(a: CompareEntry, b: CompareEntry) {
   </div>
 
   <!-- Comparison view -->
-  <CompareView v-else-if="entryA && entryB" :entry-a="entryA" :entry-b="entryB" />
+  <CompareView
+    v-else-if="entryA && entryB"
+    :entry-a="entryA"
+    :entry-b="entryB"
+    :slug-a="slugA ?? undefined"
+    :slug-b="slugB ?? undefined"
+  />
 
   <!-- Landing: file upload -->
   <CompareLanding
