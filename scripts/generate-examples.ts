@@ -93,7 +93,10 @@ function esbuildBundle(source: string, file: string, dir: string): TransformerRe
 function tscTransform(source: string, file: string, dir: string): TransformerResult {
   const inFile = join(dir, file);
   writeFileSync(inFile, source);
-  run(`npx tsc --sourceMap --target es2022 --outDir out --declaration false ${file}`, dir);
+  run(
+    `npx tsc --sourceMap --inlineSources --target es2022 --outDir out --declaration false ${file}`,
+    dir,
+  );
   const baseName = file.replace(/\.tsx?$/, ".js");
   return readOutput(join(dir, "out"), baseName);
 }
@@ -102,7 +105,7 @@ function tscDecoratorTransform(source: string, file: string, dir: string): Trans
   const inFile = join(dir, file);
   writeFileSync(inFile, source);
   run(
-    `npx tsc --sourceMap --target es2022 --experimentalDecorators --emitDecoratorMetadata --outDir out --declaration false ${file}`,
+    `npx tsc --sourceMap --inlineSources --target es2022 --experimentalDecorators --emitDecoratorMetadata --outDir out --declaration false ${file}`,
     dir,
   );
   const baseName = file.replace(/\.tsx?$/, ".js");
