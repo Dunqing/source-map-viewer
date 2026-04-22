@@ -4,6 +4,7 @@ import MarkdownIt from "markdown-it";
 import IconCopy from "~icons/carbon/copy";
 import IconCheckmark from "~icons/carbon/checkmark";
 import IconClose from "~icons/carbon/close";
+import IconLightbulb from "~icons/carbon/idea";
 import { useAiDebugPrompt } from "../composables/useAiDebugPrompt";
 
 const { prompt } = useAiDebugPrompt();
@@ -52,25 +53,29 @@ function copyPrompt() {
     @click.self="emit('close')"
   >
     <div class="bg-surface rounded-lg shadow-xl w-[800px] max-h-[80vh] flex flex-col">
-      <div class="flex items-center justify-between px-4 py-3 border-b border-edge">
-        <h2 class="text-sm font-semibold">AI Debug Prompt</h2>
-        <div class="flex items-center gap-2">
-          <span class="text-xs text-fg-muted"
-            >Tip: AI tools like Claude Code and Codex get this automatically when fetching the
-            shared URL</span
-          >
-          <button
-            class="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition"
-            @click="copyPrompt"
-          >
-            <IconCheckmark v-if="copied" class="w-4 h-4" />
-            <IconCopy v-else class="w-4 h-4" />
-            {{ copied ? "Copied!" : "Copy to clipboard" }}
-          </button>
-          <button class="p-1 rounded hover:bg-surface" @click="emit('close')">
-            <IconClose class="w-4 h-4" />
-          </button>
+      <div class="px-4 py-3 border-b border-edge">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold">AI Debug Prompt</h2>
+          <div class="flex items-center gap-2">
+            <button
+              class="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition"
+              @click="copyPrompt"
+            >
+              <IconCheckmark v-if="copied" class="w-4 h-4" />
+              <IconCopy v-else class="w-4 h-4" />
+              {{ copied ? "Copied!" : "Copy to clipboard" }}
+            </button>
+            <button class="p-1 rounded hover:bg-surface" @click="emit('close')">
+              <IconClose class="w-4 h-4" />
+            </button>
+          </div>
         </div>
+        <p
+          class="flex items-center gap-1.5 text-xs text-fg-muted mt-2 px-2 py-1.5 rounded bg-muted"
+        >
+          <IconLightbulb class="w-3.5 h-3.5 shrink-0 text-amber-500" />
+          Share a URL and AI tools (Claude Code, Codex) will fetch this prompt automatically
+        </p>
       </div>
       <div
         v-if="renderedHtml"

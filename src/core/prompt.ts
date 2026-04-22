@@ -155,57 +155,44 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
 
   const rawMappings = sourceMapJson ? JSON.parse(sourceMapJson).mappings : "";
 
+  const hasIssues = badCount > 0 || qualityWarnings.length > 0;
+
   const sections = [
     "# Source Map Debug Report",
     "",
-    "## Background",
+    ...(visualizationUrl ? [`[Open in Source Map Viewer](${visualizationUrl})`, ""] : []),
+    "## Overview",
     "",
-    "A source map maps positions in generated/compiled code back to positions in the original source.",
-    'Each mapping says: "generated line X, column Y corresponds to original file F, line A, column B".',
+    `| Metric | Value |`,
+    `|--------|-------|`,
+    `| Sources | ${sources.map(escapeMarkdown).join(", ")} |`,
+    `| Total mappings | ${totalMappings} |`,
+    `| Coverage | ${coveragePercent}% of generated code |`,
+    `| Invalid mappings | ${badCount} |`,
+    `| Quality warnings | ${qualityWarnings.length} |`,
+    `| Names | ${parsedData.names.length > 0 ? parsedData.names.length : "none"} |`,
     "",
-    "Source map issues fall into two categories:",
-    "",
-    "### Invalid mappings (⚠️ in table)",
-    "- **Negative column/line** — the transformer computed a wrong offset",
-    "- **Invalid source index** — references a source file that doesn't exist",
-    "",
-    "### Quality issues (⚡ in table)",
-    "- **Whitespace targeting** — mapping column lands in leading indentation instead of the actual code token. Causes imprecise breakpoints and wrong stepping in debuggers.",
-    "- **Low coverage** — large regions of generated code have no mappings at all, making those areas impossible to debug.",
-    "- **Missing sourcesContent** — the source map doesn't embed original source, so debuggers can't show it without the files on disk.",
-    "",
-    "## Problem",
-    "",
-    ...(badCount > 0
+    ...(hasIssues
       ? [
-          `This source map has **${badCount} invalid mapping(s)** out of ${totalMappings} total.`,
-          `The first invalid mapping appears at generated position ${allMappings[firstBadIdx]?.gen ?? "?"}.`,
+          "## Issues",
+          "",
+          ...(badCount > 0
+            ? [
+                `**${badCount} invalid mapping(s)** — position data violates the spec:`,
+                `- First at generated position ${allMappings[firstBadIdx]?.gen ?? "?"}`,
+                "",
+              ]
+            : []),
+          ...(qualityWarnings.length > 0
+            ? [...qualityWarnings.map((w) => `- ${w.message}`), ""]
+            : []),
         ]
-      : []),
-    ...(qualityWarnings.length > 0
-      ? [
-          `**Quality issues found (${qualityWarnings.length}):**`,
-          ...qualityWarnings.map((w) => `- ${w.message}`),
-        ]
-      : []),
-    ...(badCount === 0 && qualityWarnings.length === 0
-      ? [
-          "No invalid mappings or quality issues detected. Mappings may still point to semantically wrong (but technically valid) locations.",
-        ]
-      : []),
-    "",
-    "## Summary",
-    "",
-    `- **Sources:** ${sources.map(escapeMarkdown).join(", ")}`,
-    `- **Total mappings:** ${totalMappings}`,
-    `- **Invalid mappings:** ${badCount}`,
-    `- **Quality warnings:** ${qualityWarnings.length}`,
-    `- **Coverage:** ${coveragePercent}% of generated code is mapped`,
-    `- **Names in source map:** ${parsedData.names.length > 0 ? parsedData.names.map(escapeMarkdown).join(", ") : "(none)"}`,
-    ...(visualizationUrl
-      ? [`- **Visualization:** [Open in Source Map Viz](${visualizationUrl})`]
-      : []),
-    "",
+      : [
+          "## Issues",
+          "",
+          "No invalid mappings or quality issues detected. Review the mapping table below for semantic correctness.",
+          "",
+        ]),
     "## Original code",
     "",
     `\`\`\`${detectLanguage(sources[0] ?? "")}`,
@@ -218,29 +205,20 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
     numberedGen,
     "```",
     "",
-    `## Mappings${mappingNote ? ` (${mappingNote})` : ` (${allMappings.length})`}`,
+    `## Mapping table${mappingNote ? ` (${mappingNote})` : ` (${allMappings.length})`}`,
     "",
-    "Each row: generated position → original position. ⚠️ = invalid mapping, ⚡ = points to whitespace.",
+    "Generated → Original. Flags: ⚠️ invalid position, ⚡ maps to whitespace.",
     "",
     header,
     divider,
     ...relevantMappings.map(formatRow),
     "",
-    "## Raw VLQ mappings string",
+    "## Analysis instructions",
     "",
-    "```",
-    rawMappings,
-    "```",
-    "",
-    "## Your task",
-    "",
-    "Analyze the mappings above and answer:",
-    "",
-    "1. **Where do mappings go wrong?** Identify the first incorrect or imprecise mapping and what it should map to instead.",
-    "2. **What is the pattern?** Is it progressive drift? Random? Only in certain code constructs (decorators, JSX, class fields)?",
-    "3. **Quality issues?** Are mappings pointing to whitespace (⚡) instead of actual tokens? Are large regions unmapped?",
-    "4. **What is the root cause?** What did the transformer do wrong? (e.g., didn't account for removed decorator lines, used statement span instead of token span, wrong column offset for indented code, etc.)",
-    "5. **How to fix it?** What specific change in the transformer would correct the source map output?",
+    "1. **Locate the issue** — Find the first mapping where the generated snippet doesn't correspond to the original snippet. What should it map to instead?",
+    "2. **Identify the pattern** — Is the error a consistent line offset? Column drift? Restricted to specific constructs (decorators, JSX, destructuring)?",
+    "3. **Diagnose the root cause** — What did the transformer do wrong? Common causes: not accounting for removed/inserted lines, using statement spans instead of token spans, wrong column offset for indented code.",
+    "4. **Suggest a fix** — What specific change in the transformer's source map generation would correct this?",
   ];
 
   return sections.join("\n");
