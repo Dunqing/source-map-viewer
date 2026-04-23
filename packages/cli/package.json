@@ -2,6 +2,7 @@
   "name": "source-map-viewer",
   "version": "0.2.0",
   "description": "Inspect and debug source map mappings from the terminal",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/Dunqing/source-map-viewer",
