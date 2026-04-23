@@ -38,8 +38,13 @@ function makeGeneratedKey(seg: MappingSegment): string {
   return `${seg.generatedLine}:${seg.generatedColumn}`;
 }
 
+export function normalizeSourceName(source: string): string {
+  return source.replace(/\\/g, "/").replace(/^(\.\/)+/, "");
+}
+
 function sourceId(seg: MappingSegment, sources?: string[]): string {
-  return sources?.[seg.sourceIndex] ?? `#${seg.sourceIndex}`;
+  const source = sources?.[seg.sourceIndex];
+  return source ? normalizeSourceName(source) : `#${seg.sourceIndex}`;
 }
 
 function makeOriginalKey(seg: MappingSegment, sources?: string[]): string {

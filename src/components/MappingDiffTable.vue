@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { findExactMappingInSameSource, findNearestMappingInSameSource } from "../core/diff";
+import { computed, ref, watch } from "vue";
+import {
+  findExactMappingInSameSource,
+  findNearestMappingInSameSource,
+  normalizeSourceName,
+} from "../core/diff";
 import type { DiffEntry, DiffSummary } from "../core/diff";
 import type { MappingSegment } from "../core/types";
 import { extractGeneratedSnippet, extractOriginalSnippet } from "../core/snippets";
@@ -22,6 +26,22 @@ const showSame = ref(false);
 const expandedIndex = ref<string | null>(null);
 
 const CONTEXT_LINES = 3;
+const EMPTY_PREVIEW_SIDE_DATA = {
+  exactRaw: null,
+  nearestRaw: null,
+  previewSegment: null,
+} as const;
+
+interface PreviewSideData {
+  exactRaw: MappingSegment | null;
+  nearestRaw: MappingSegment | null;
+  previewSegment: MappingSegment | null;
+}
+
+interface EntryPreviewData {
+  a: PreviewSideData;
+  b: PreviewSideData;
+}
 
 const filteredEntries = computed(() =>
   showSame.value ? props.entries : props.entries.filter((e) => e.status !== "same"),
@@ -110,6 +130,10 @@ function generatedDiffSnippet(entry: DiffEntry, side: "a" | "b"): string {
   return formatPointSnippet(line, seg.generatedColumn, { visibleWhitespace: true });
 }
 
+function normalizedSourceLabel(source: string | undefined, sourceIndex: number): string {
+  return source ? normalizeSourceName(source) : `#${sourceIndex}`;
+}
+
 function originalSourceName(entry: DiffEntry, side: "a" | "b"): string {
   const seg = entry[side];
   if (!seg) {
@@ -117,10 +141,10 @@ function originalSourceName(entry: DiffEntry, side: "a" | "b"): string {
     const otherSeg = entry[otherSide];
     if (!otherSeg) return "";
     const otherSources = otherSide === "a" ? props.sourcesA : props.sourcesB;
-    return otherSources[otherSeg.sourceIndex] ?? "";
+    return normalizedSourceLabel(otherSources[otherSeg.sourceIndex], otherSeg.sourceIndex);
   }
   const sources = side === "a" ? props.sourcesA : props.sourcesB;
-  return sources[seg.sourceIndex] ?? `#${seg.sourceIndex}`;
+  return normalizedSourceLabel(sources[seg.sourceIndex], seg.sourceIndex);
 }
 
 function isGeneratedChanged(entry: DiffEntry): boolean {
@@ -175,34 +199,87 @@ function sourcesForSide(side: "a" | "b"): string[] {
   return side === "a" ? props.sourcesA : props.sourcesB;
 }
 
-function nearestRawMapping(entry: DiffEntry, side: "a" | "b"): MappingSegment | null {
+function buildPreviewSideData(entry: DiffEntry, side: "a" | "b"): PreviewSideData {
+  const current = entry[side];
+  if (current) {
+    return {
+      exactRaw: null,
+      nearestRaw: null,
+      previewSegment: current,
+    };
+  }
+
+  if (!isDisappearedEntry(entry)) {
+    return EMPTY_PREVIEW_SIDE_DATA;
+  }
+
   const otherSide = side === "a" ? "b" : "a";
   const target = entry[otherSide];
-  if (!target) return null;
-  return findNearestMappingInSameSource(
+  if (!target) return EMPTY_PREVIEW_SIDE_DATA;
+
+  const exactRaw = findExactMappingInSameSource(
     target,
     sourcesForSide(otherSide),
     rawMappingsForSide(side),
     sourcesForSide(side),
   );
+  const nearestRaw =
+    exactRaw ??
+    findNearestMappingInSameSource(
+      target,
+      sourcesForSide(otherSide),
+      rawMappingsForSide(side),
+      sourcesForSide(side),
+    );
+
+  return {
+    exactRaw,
+    nearestRaw,
+    previewSegment: nearestRaw,
+  };
+}
+
+let previewDataCache = new WeakMap<DiffEntry, EntryPreviewData>();
+
+watch(
+  [
+    () => props.entries,
+    () => props.rawMappingsA,
+    () => props.rawMappingsB,
+    () => props.sourcesA,
+    () => props.sourcesB,
+  ],
+  () => {
+    previewDataCache = new WeakMap();
+  },
+);
+
+function getEntryPreviewData(entry: DiffEntry): EntryPreviewData {
+  const cached = previewDataCache.get(entry);
+  if (cached) return cached;
+
+  const data = {
+    a: buildPreviewSideData(entry, "a"),
+    b: buildPreviewSideData(entry, "b"),
+  };
+  previewDataCache.set(entry, data);
+  return data;
+}
+
+function previewData(entry: DiffEntry, side: "a" | "b"): PreviewSideData {
+  return getEntryPreviewData(entry)[side] ?? EMPTY_PREVIEW_SIDE_DATA;
+}
+
+function nearestRawMapping(entry: DiffEntry, side: "a" | "b"): MappingSegment | null {
+  return previewData(entry, side).nearestRaw;
 }
 
 function exactRawCounterpart(entry: DiffEntry, side: "a" | "b"): MappingSegment | null {
-  const otherSide = side === "a" ? "b" : "a";
-  const target = entry[otherSide];
-  if (!target) return null;
-  return findExactMappingInSameSource(
-    target,
-    sourcesForSide(otherSide),
-    rawMappingsForSide(side),
-    sourcesForSide(side),
-  );
+  return previewData(entry, side).exactRaw;
 }
 
 function previewSegment(entry: DiffEntry, side: "a" | "b"): MappingSegment | null {
-  if (entry[side]) return entry[side];
-  if (!isDisappearedEntry(entry)) return null;
-  return nearestRawMapping(entry, side);
+  return previewData(entry, side).previewSegment;
 }
 
 function previewReference(

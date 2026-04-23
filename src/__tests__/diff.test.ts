@@ -88,6 +88,23 @@ describe("diffMappings", () => {
     expect(result.entries[0].status).toBe("changed");
   });
 
+  it("treats equivalent normalized source paths as the same file", () => {
+    const a = [seg(0, 0, 1, 0, 0)];
+    const b = [seg(0, 0, 1, 0, 0)];
+    const result = diffMappings(a, b, {
+      sourcesA: ["./input.ts"],
+      sourcesB: ["input.ts"],
+    });
+
+    expect(result.summary).toEqual({
+      same: 1,
+      changed: 0,
+      removed: 0,
+      added: 0,
+    });
+    expect(result.entries[0].status).toBe("same");
+  });
+
   it("detects removed mapping present in A but not B", () => {
     const a = [seg(0, 0, 1, 0), seg(0, 5, 2, 3)];
     const b = [seg(0, 0, 1, 0)];
