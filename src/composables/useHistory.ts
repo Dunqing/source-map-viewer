@@ -4,10 +4,15 @@ export interface HistoryEntry {
   label: string;
   slug: string;
   timestamp: number;
+  sessionLabel?: string;
 }
 
 const STORAGE_KEY = "smv-history";
 const MAX_ENTRIES = 5;
+
+function historyKey(slug: string): string {
+  return slug.split("?")[0];
+}
 
 function normalizeEntry(value: unknown): HistoryEntry | null {
   if (typeof value !== "object" || value === null) return null;
@@ -28,6 +33,7 @@ function normalizeEntry(value: unknown): HistoryEntry | null {
     label: record.label,
     slug,
     timestamp: record.timestamp,
+    sessionLabel: typeof record.sessionLabel === "string" ? record.sessionLabel : undefined,
   };
 }
 
@@ -59,7 +65,7 @@ export function useHistory() {
   });
 
   function addEntry(entry: HistoryEntry) {
-    const filtered = entries.value.filter((e) => e.slug !== entry.slug);
+    const filtered = entries.value.filter((e) => historyKey(e.slug) !== historyKey(entry.slug));
     entries.value = [entry, ...filtered].slice(0, MAX_ENTRIES);
     saveToStorage(entries.value);
   }

@@ -1,5 +1,10 @@
-import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { basename, dirname, relative, resolve } from "node:path";
+import {
+  hydrateSourceMapJson,
+  resolveSourceMapFromFileCollection,
+  type FileCollectionEntry,
+} from "../../../src/core/inputResolver.js";
 
 export interface ResolvedSourceMap {
   generatedCode: string;
@@ -17,6 +22,14 @@ const EXTERNAL_SOURCE_MAP_RE =
 
 const SOURCE_MAP_EXTENSIONS = new Set([".map", ".json"]);
 const GENERATED_CODE_EXTENSIONS = new Set([".js", ".ts", ".css"]);
+
+function normalizePath(input: string): string {
+  return input.replace(/\\/g, "/");
+}
+
+function isAbsoluteLikePath(path: string): boolean {
+  return path.startsWith("/") || /^[A-Za-z]:\//.test(normalizePath(path));
+}
 
 function decodeSourceMapDataUrl(input: string): string | null {
   const trimmed = input.trim();
@@ -54,6 +67,16 @@ function readFile(filePath: string): string {
   return readFileSync(absolute, "utf-8");
 }
 
+function hydrateFromDisk(sourceMapJson: string, anchorPath: string): string {
+  return hydrateSourceMapJson(sourceMapJson, normalizePath(anchorPath), {
+    get(candidatePath) {
+      if (!isAbsoluteLikePath(candidatePath)) return null;
+      if (!existsSync(candidatePath)) return null;
+      return readFileSync(candidatePath, "utf-8");
+    },
+  });
+}
+
 function resolveFromSourceMap(filePath: string, sourceMapJson: string): { generatedCode: string } {
   const absolute = resolve(filePath);
   const dir = dirname(absolute);
@@ -87,7 +110,7 @@ function resolveFromSourceMap(filePath: string, sourceMapJson: string): { genera
 function resolveFromGeneratedCode(
   filePath: string,
   generatedCode: string,
-): { sourceMapJson: string; generatedCode: string } {
+): { sourceMapJson: string; generatedCode: string; anchorPath: string } {
   const absolute = resolve(filePath);
   const dir = dirname(absolute);
   const name = basename(absolute);
@@ -101,7 +124,7 @@ function resolveFromGeneratedCode(
     }
     // Strip the sourceMappingURL comment from the generated code
     const cleanedCode = generatedCode.replace(INLINE_SOURCE_MAP_RE, "");
-    return { sourceMapJson, generatedCode: cleanedCode };
+    return { sourceMapJson, generatedCode: cleanedCode, anchorPath: absolute };
   }
 
   // 2. Check for external sourceMappingURL comment
@@ -113,14 +136,14 @@ function resolveFromGeneratedCode(
       throw new Error(`Source map not found: ${mapPath} (referenced by ${name})`);
     }
     const sourceMapJson = readFileSync(mapPath, "utf-8");
-    return { sourceMapJson, generatedCode };
+    return { sourceMapJson, generatedCode, anchorPath: mapPath };
   }
 
   // 3. Check for sibling .map file
   const siblingMapPath = `${absolute}.map`;
   if (existsSync(siblingMapPath)) {
     const sourceMapJson = readFileSync(siblingMapPath, "utf-8");
-    return { sourceMapJson, generatedCode };
+    return { sourceMapJson, generatedCode, anchorPath: siblingMapPath };
   }
 
   throw new Error(
@@ -137,22 +160,55 @@ function getExtension(filePath: string): string {
   return name.slice(dotIndex);
 }
 
+function collectDirectoryEntries(rootDir: string): FileCollectionEntry[] {
+  const entries: FileCollectionEntry[] = [];
+
+  function walk(dirPath: string) {
+    for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+      const absolutePath = resolve(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        walk(absolutePath);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+
+      entries.push({
+        path: normalizePath(relative(rootDir, absolutePath)),
+        content: readFileSync(absolutePath, "utf-8"),
+      });
+    }
+  }
+
+  walk(rootDir);
+  return entries;
+}
+
 export function resolveFile(filePath: string): ResolvedSourceMap {
   const absolute = resolve(filePath);
+  if (!existsSync(absolute)) {
+    throw new Error(`File not found: ${absolute}`);
+  }
+
+  if (statSync(absolute).isDirectory()) {
+    return resolveSourceMapFromFileCollection(collectDirectoryEntries(absolute));
+  }
+
   const content = readFile(absolute);
   const ext = getExtension(absolute);
   const label = basename(absolute);
 
   if (SOURCE_MAP_EXTENSIONS.has(ext)) {
-    const { generatedCode } = resolveFromSourceMap(absolute, content);
-    return { generatedCode, sourceMapJson: content, label };
+    const sourceMapJson = hydrateFromDisk(content, absolute);
+    const { generatedCode } = resolveFromSourceMap(absolute, sourceMapJson);
+    return { generatedCode, sourceMapJson, label };
   }
 
   if (GENERATED_CODE_EXTENSIONS.has(ext)) {
     const result = resolveFromGeneratedCode(absolute, content);
+    const sourceMapJson = hydrateFromDisk(result.sourceMapJson, result.anchorPath);
     return {
       generatedCode: result.generatedCode,
-      sourceMapJson: result.sourceMapJson,
+      sourceMapJson,
       label,
     };
   }
@@ -160,17 +216,19 @@ export function resolveFile(filePath: string): ResolvedSourceMap {
   // Unknown extension — try treating as generated code first
   try {
     const result = resolveFromGeneratedCode(absolute, content);
+    const sourceMapJson = hydrateFromDisk(result.sourceMapJson, result.anchorPath);
     return {
       generatedCode: result.generatedCode,
-      sourceMapJson: result.sourceMapJson,
+      sourceMapJson,
       label,
     };
   } catch {
     // Fall back to treating as source map
     try {
       JSON.parse(content); // validate it's JSON
-      const { generatedCode } = resolveFromSourceMap(absolute, content);
-      return { generatedCode, sourceMapJson: content, label };
+      const sourceMapJson = hydrateFromDisk(content, absolute);
+      const { generatedCode } = resolveFromSourceMap(absolute, sourceMapJson);
+      return { generatedCode, sourceMapJson, label };
     } catch {
       throw new Error(
         `No source map found for ${label}.\nLooked for: inline sourceMappingURL, external .map reference, ${label}.map`,

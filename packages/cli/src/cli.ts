@@ -16,12 +16,12 @@ const HELP_TEXT = `
 source-map-viewer — Inspect and debug source map mappings
 
 Usage:
-  source-map-viewer <file>                        Upload and open in browser
-  source-map-viewer <file> --url                  Print shareable URL only
-  source-map-viewer <file> --ai                   Print markdown debug report (offline)
-  source-map-viewer compare <fileA> <fileB>       Compare two source maps in browser
-  source-map-viewer compare <fileA> <fileB> --url Print compare URL only
-  source-map-viewer compare <fileA> <fileB> --ai  Print diff report to stdout
+  source-map-viewer <path>                        Upload a file or folder and open in browser
+  source-map-viewer <path> --url                  Print shareable URL only
+  source-map-viewer <path> --ai                   Print markdown debug report (offline)
+  source-map-viewer compare <pathA> <pathB>       Compare two source maps in browser
+  source-map-viewer compare <pathA> <pathB> --url Print compare URL only
+  source-map-viewer compare <pathA> <pathB> --ai  Print diff report to stdout
 
 Options:
   --url          Print URL without opening browser
@@ -29,6 +29,7 @@ Options:
   --ai           Print AI-friendly markdown report to stdout
   --copy         Copy output to clipboard (works with --ai and --url)
   --host <url>   Custom API host (default: https://source-map-viewer.void.app)
+                 Directory inputs must contain one unambiguous source map entrypoint
   -h, --help     Show this help
 `.trim();
 
@@ -162,8 +163,8 @@ async function handleCompare(
   flags: { aiMode: boolean; urlOnly: boolean; copy: boolean; host?: string },
 ) {
   if (positional.length < 2) {
-    console.error("Error: compare requires two file arguments");
-    console.error("Usage: source-map-viewer compare <fileA> <fileB>");
+    console.error("Error: compare requires two file or folder arguments");
+    console.error("Usage: source-map-viewer compare <pathA> <pathB>");
     process.exit(1);
   }
 

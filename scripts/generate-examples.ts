@@ -16,7 +16,7 @@
 
 import { execSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -25,6 +25,16 @@ import { join } from "node:path";
 interface TransformerResult {
   generatedCode: string;
   sourceMapJson: string;
+  entries?: ExampleEntry[];
+}
+
+interface ExampleEntry {
+  generatedCode: string;
+  sourceMapJson: string;
+  label: string;
+  entryPath: string;
+  generatedPath?: string;
+  sourceMapPath?: string;
 }
 
 interface ExampleDef {
@@ -32,8 +42,6 @@ interface ExampleDef {
   description: string;
   file: string;
   source: string;
-  /** Extra source files needed for bundling (MultiFileApp) */
-  extraFiles?: Record<string, string>;
   transformers: Record<string, (source: string, file: string, dir: string) => TransformerResult>;
 }
 
@@ -42,6 +50,8 @@ interface ExampleDef {
 // ---------------------------------------------------------------------------
 
 const TMP = join("/tmp", "sourcemap-gen-examples");
+const WORKSPACE_ROOT = join(import.meta.dirname!, "..");
+const VP_BIN = join(process.env.HOME ?? "", ".vite-plus", "bin", "vp");
 
 function ensureDir(dir: string) {
   mkdirSync(dir, { recursive: true });
@@ -61,11 +71,44 @@ function readOutput(dir: string, outFile: string): TransformerResult {
   };
 }
 
+function readOutputCollection(dir: string, outFiles: string[]): TransformerResult {
+  const entries = [...outFiles].sort().map((outFile) => {
+    const result = readOutput(dir, outFile);
+    return {
+      generatedCode: result.generatedCode,
+      sourceMapJson: result.sourceMapJson,
+      label: basename(outFile),
+      entryPath: outFile,
+      generatedPath: outFile,
+      sourceMapPath: `${outFile}.map`,
+    };
+  });
+
+  const first = entries[0];
+  if (!first) {
+    throw new Error("No output files were generated");
+  }
+
+  return {
+    generatedCode: first.generatedCode,
+    sourceMapJson: first.sourceMapJson,
+    entries,
+  };
+}
+
 const GLOBAL_MODULES = execSync("npm root -g", { encoding: "utf-8" }).trim();
 
 function run(cmd: string, cwd: string) {
   execSync(cmd, {
     cwd,
+    stdio: "pipe",
+    env: { ...process.env, NODE_OPTIONS: "", NODE_PATH: GLOBAL_MODULES },
+  });
+}
+
+function runFromWorkspace(cmd: string) {
+  execSync(cmd, {
+    cwd: WORKSPACE_ROOT,
     stdio: "pipe",
     env: { ...process.env, NODE_OPTIONS: "", NODE_PATH: GLOBAL_MODULES },
   });
@@ -94,24 +137,24 @@ function esbuildBundle(source: string, file: string, dir: string): TransformerRe
 
 function tscTransform(source: string, file: string, dir: string): TransformerResult {
   const inFile = join(dir, file);
+  const outDir = join(dir, "out");
   writeFileSync(inFile, source);
-  run(
-    `tsc --sourceMap --inlineSources --target es2022 --outDir out --declaration false ${file}`,
-    dir,
+  runFromWorkspace(
+    `${JSON.stringify(VP_BIN)} dlx -p typescript tsc --ignoreConfig --sourceMap --inlineSources --target es2022 --outDir ${JSON.stringify(outDir)} --declaration false ${JSON.stringify(inFile)}`,
   );
   const baseName = file.replace(/\.tsx?$/, ".js");
-  return readOutput(join(dir, "out"), baseName);
+  return readOutput(outDir, baseName);
 }
 
 function tscDecoratorTransform(source: string, file: string, dir: string): TransformerResult {
   const inFile = join(dir, file);
+  const outDir = join(dir, "out");
   writeFileSync(inFile, source);
-  run(
-    `tsc --sourceMap --inlineSources --target es2022 --experimentalDecorators --emitDecoratorMetadata --outDir out --declaration false ${file}`,
-    dir,
+  runFromWorkspace(
+    `${JSON.stringify(VP_BIN)} dlx -p typescript tsc --ignoreConfig --sourceMap --inlineSources --target es2022 --experimentalDecorators --emitDecoratorMetadata --outDir ${JSON.stringify(outDir)} --declaration false ${JSON.stringify(inFile)}`,
   );
   const baseName = file.replace(/\.tsx?$/, ".js");
-  return readOutput(join(dir, "out"), baseName);
+  return readOutput(outDir, baseName);
 }
 
 function swcTransform(source: string, file: string, dir: string): TransformerResult {
@@ -202,6 +245,19 @@ function oxcDecoratorTransform(source: string, file: string, dir: string): Trans
 function rolldownBundle(_source: string, _file: string, dir: string): TransformerResult {
   run(`rolldown app.ts -f esm -o out.js -s`, dir);
   return readOutput(dir, "out.js");
+}
+
+function esbuildMultiEntryBundle(_source: string, _file: string, dir: string): TransformerResult {
+  run(
+    `esbuild alpha.ts beta.ts --bundle --sourcemap=external --outdir=dist --format=esm --target=es2017`,
+    dir,
+  );
+  return readOutputCollection(join(dir, "dist"), ["alpha.js", "beta.js"]);
+}
+
+function rolldownMultiEntryBundle(_source: string, _file: string, dir: string): TransformerResult {
+  run(`rolldown alpha.ts beta.ts -d dist -f esm -s --transform.target es2017`, dir);
+  return readOutputCollection(join(dir, "dist"), ["alpha.js", "beta.js"]);
 }
 
 // ---------------------------------------------------------------------------
@@ -664,12 +720,6 @@ const MultiFileApp: ExampleDef = {
   description: "Multi-file bundle with const enums",
   file: "app.ts",
   source: multiFileAppSource,
-  extraFiles: {
-    "types.ts": multiFileTypes,
-    "logger.ts": multiFileLogger,
-    "api.ts": multiFileApi,
-    "utils.ts": multiFileUtils,
-  },
   transformers: {
     esbuild: (source, file, dir) => {
       multiFileBundleSetup(dir);
@@ -682,11 +732,99 @@ const MultiFileApp: ExampleDef = {
   },
 };
 
+const multiEntryAlphaSource = `type AlphaInput = {
+  user?: {
+    profile?: {
+      displayName?: string;
+    };
+  };
+  flags?: string[];
+};
+
+class AlphaFormatter {
+  prefix = "alpha";
+
+  alphaMessage(input?: AlphaInput) {
+    const displayName = input?.user?.profile?.displayName?.trim() ?? "guest";
+    const flags = [...(input?.flags ?? []), "entry"];
+    return {
+      ...(input ?? {}),
+      flags,
+      message: \`\${this.prefix}:\${displayName.toUpperCase()}\`,
+    };
+  }
+}
+
+const formatter = new AlphaFormatter();
+console.log(
+  formatter.alphaMessage({
+    user: { profile: { displayName: " demo " } },
+  }),
+);
+
+export {};
+`;
+
+const multiEntryBetaSource = `const defaultWeights = {
+  primary: 2,
+  secondary: 1,
+};
+
+function betaTotal(values?: Array<number | null>, overrides?: Partial<typeof defaultWeights>) {
+  const weights = {
+    ...defaultWeights,
+    ...overrides,
+  };
+  const normalized = values?.filter((value): value is number => value != null) ?? [];
+  return normalized.reduce((sum, value, index) => {
+    const weight = index === 0 ? weights.primary : weights.secondary;
+    return sum + value * weight;
+  }, 0);
+}
+
+const summary = {
+  total: betaTotal([1, 2, null, 4], { secondary: 3 }),
+  meta: { label: "weighted" as string | undefined },
+};
+
+console.log(summary.meta?.label ?? "plain", summary.total);
+
+export {};
+`;
+
+function multiEntryBundleSetup(dir: string) {
+  writeFileSync(join(dir, "alpha.ts"), multiEntryAlphaSource);
+  writeFileSync(join(dir, "beta.ts"), multiEntryBetaSource);
+}
+
+const MultiEntryBundle: ExampleDef = {
+  name: "Multi-Entry Bundle",
+  description: "Modern syntax lowered across two emitted entrypoints",
+  file: "alpha.ts",
+  source: multiEntryAlphaSource,
+  transformers: {
+    esbuild: (source, file, dir) => {
+      multiEntryBundleSetup(dir);
+      return esbuildMultiEntryBundle(source, file, dir);
+    },
+    rolldown: (source, file, dir) => {
+      multiEntryBundleSetup(dir);
+      return rolldownMultiEntryBundle(source, file, dir);
+    },
+  },
+};
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
-const examples: ExampleDef[] = [ReactTodoApp, TypeScriptClasses, LegacyDecorators, MultiFileApp];
+const examples: ExampleDef[] = [
+  ReactTodoApp,
+  TypeScriptClasses,
+  LegacyDecorators,
+  MultiFileApp,
+  MultiEntryBundle,
+];
 
 function generateAll() {
   console.log("Generating example source maps...\n");
@@ -698,8 +836,6 @@ function generateAll() {
   const results: Array<{
     name: string;
     description: string;
-    file: string;
-    source: string;
     transformers: Record<string, TransformerResult>;
   }> = [];
 
@@ -715,16 +851,23 @@ function generateAll() {
       try {
         const result = transformFn(example.source, example.file, dir);
 
-        // Validate the source map JSON
-        const map = JSON.parse(result.sourceMapJson);
-        if (!map.mappings || !map.sources) {
-          throw new Error("Invalid source map: missing mappings or sources");
+        const mapsToValidate = result.entries?.length ? result.entries : [result];
+        for (const item of mapsToValidate) {
+          const map = JSON.parse(item.sourceMapJson);
+          if (!map.mappings || !map.sources) {
+            throw new Error("Invalid source map: missing mappings or sources");
+          }
         }
 
         transformerResults[name] = result;
-        console.log(
-          `OK (${result.generatedCode.split("\n").length} lines, ${map.mappings.length} chars mappings)`,
-        );
+        if (result.entries?.length) {
+          console.log(`OK (${result.entries.length} entry files)`);
+        } else {
+          const map = JSON.parse(result.sourceMapJson);
+          console.log(
+            `OK (${result.generatedCode.split("\n").length} lines, ${map.mappings.length} chars mappings)`,
+          );
+        }
       } catch (e: unknown) {
         const errorMessage = e instanceof Error ? e.message : String(e);
         console.log(`FAILED: ${errorMessage}`);
@@ -735,8 +878,6 @@ function generateAll() {
     results.push({
       name: example.name,
       description: example.description,
-      file: example.file,
-      source: example.source,
       transformers: transformerResults,
     });
   }
@@ -746,12 +887,16 @@ function generateAll() {
 
   let output = `// Auto-generated by scripts/generate-examples.ts — do not edit manually.\n`;
   output += `// Re-run: vp dlx tsx scripts/generate-examples.ts\n\n`;
+  output += `import type { ResolvedFileCollection } from "../core/inputResolver";\n\n`;
+  output += `export interface ExampleTransformerResult {\n`;
+  output += `  generatedCode: string;\n`;
+  output += `  sourceMapJson: string;\n`;
+  output += `  entries?: ResolvedFileCollection[];\n`;
+  output += `}\n\n`;
   output += `export interface ExampleSource {\n`;
   output += `  name: string;\n`;
   output += `  description: string;\n`;
-  output += `  file: string;\n`;
-  output += `  source: string;\n`;
-  output += `  transformers: Record<string, { generatedCode: string; sourceMapJson: string }>;\n`;
+  output += `  transformers: Record<string, ExampleTransformerResult>;\n`;
   output += `}\n\n`;
 
   for (const example of results) {
@@ -764,14 +909,30 @@ function generateAll() {
     output += `const ${varName}: ExampleSource = {\n`;
     output += `  name: ${JSON.stringify(example.name)},\n`;
     output += `  description: ${JSON.stringify(example.description)},\n`;
-    output += `  file: ${JSON.stringify(example.file)},\n`;
-    output += `  source:\n    ${JSON.stringify(example.source)},\n`;
     output += `  transformers: {\n`;
 
     for (const [tName, tResult] of Object.entries(example.transformers)) {
       output += `    ${tName}: {\n`;
       output += `      generatedCode:\n        ${JSON.stringify(tResult.generatedCode)},\n`;
       output += `      sourceMapJson: JSON.stringify(${tResult.sourceMapJson}),\n`;
+      if (tResult.entries?.length) {
+        output += `      entries: [\n`;
+        for (const entry of tResult.entries) {
+          output += `        {\n`;
+          output += `          generatedCode:\n            ${JSON.stringify(entry.generatedCode)},\n`;
+          output += `          sourceMapJson: JSON.stringify(${entry.sourceMapJson}),\n`;
+          output += `          label: ${JSON.stringify(entry.label)},\n`;
+          output += `          entryPath: ${JSON.stringify(entry.entryPath)},\n`;
+          if (entry.generatedPath) {
+            output += `          generatedPath: ${JSON.stringify(entry.generatedPath)},\n`;
+          }
+          if (entry.sourceMapPath) {
+            output += `          sourceMapPath: ${JSON.stringify(entry.sourceMapPath)},\n`;
+          }
+          output += `        },\n`;
+        }
+        output += `      ],\n`;
+      }
       output += `    },\n`;
     }
 

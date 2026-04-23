@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, nextTick } from "vue";
+import { computed, ref, watch, onMounted, onUnmounted, nextTick } from "vue";
 import { useSourceMapStore } from "../stores/sourceMap";
 import { useHighlighter } from "../composables/useHighlighter";
+import { formatMultiEntryHistoryLabel } from "../composables/historyLabels";
 import { useTheme } from "../composables/useTheme";
 import { compressToHash } from "../composables/useShareableUrl";
+import { useHistory } from "../composables/useHistory";
 import CodePanel from "../components/CodePanel.vue";
 import Toolbar from "../components/Toolbar.vue";
 import StatusBar from "../components/StatusBar.vue";
 import SourceTabs from "../components/SourceTabs.vue";
+import EntrypointTabs from "../components/EntrypointTabs.vue";
 import StatsPanel from "../components/StatsPanel.vue";
 import MappingsPanel from "../components/MappingsPanel.vue";
 import SearchBar from "../components/SearchBar.vue";
@@ -17,6 +20,7 @@ import type { MappingSegment } from "../core/types";
 
 const store = useSourceMapStore();
 const { init, loading: highlighterLoading } = useHighlighter();
+const { addEntry: addHistoryEntry } = useHistory();
 useTheme();
 
 const showStats = ref(false);
@@ -32,6 +36,8 @@ onMounted(() => {
   // Restore UI state from URL params (client-only)
   const params = new URLSearchParams(window.location.search);
   showStats.value = params.get("stats") === "1";
+  const initialEntry = Number(params.get("entry"));
+  if (initialEntry > 0) store.setActiveGeneratedEntry(initialEntry);
   const initialTab = Number(params.get("tab"));
   if (initialTab > 0) store.setActiveSource(initialTab);
 
@@ -69,6 +75,8 @@ function syncUrlParams() {
   clearTimeout(urlSyncTimer);
   urlSyncTimer = window.setTimeout(() => {
     const p = new URLSearchParams();
+    if (store.activeGeneratedEntryIndex > 0)
+      p.set("entry", String(store.activeGeneratedEntryIndex));
     if (store.activeSourceIndex > 0) p.set("tab", String(store.activeSourceIndex));
     if (showStats.value) p.set("stats", "1");
     if (selectedSegIndex.value != null) p.set("seg", String(selectedSegIndex.value));
@@ -78,11 +86,41 @@ function syncUrlParams() {
   }, 16);
 }
 
-watch([showMappings, showStats, () => store.activeSourceIndex, selectedSegIndex], syncUrlParams);
+watch(
+  [
+    showMappings,
+    showStats,
+    () => store.activeGeneratedEntryIndex,
+    () => store.activeSourceIndex,
+    selectedSegIndex,
+  ],
+  syncUrlParams,
+);
+watch(
+  [() => store.activeGeneratedEntryIndex, () => store.sessionSlug],
+  ([index, slug], [previousIndex, previousSlug]) => {
+    if (!slug || store.generatedEntryCount <= 1) return;
+    if (index === previousIndex && slug === previousSlug) return;
+    const activeEntry = store.activeGeneratedEntry;
+    if (!activeEntry) return;
+    const sessionLabel = store.sessionLabel || "Build folder";
+    addHistoryEntry({
+      label: formatMultiEntryHistoryLabel(
+        sessionLabel,
+        activeEntry.entryPath || activeEntry.label,
+        store.generatedEntryCount,
+      ),
+      slug: index > 0 ? `${slug}?entry=${index}` : slug,
+      timestamp: Date.now(),
+      sessionLabel,
+    });
+  },
+);
 const showAiDebug = ref(false);
 const showSearch = ref(false);
 const searchQuery = ref("");
 const toast = ref<string | null>(null);
+const generatedTabs = computed(() => store.generatedEntries.map((entry) => entry.entryPath));
 
 function showToast(message: string) {
   toast.value = message;
@@ -169,6 +207,14 @@ function handleGeneratedSegmentClick(segment: MappingSegment) {
   }
 }
 
+function handleGeneratedTabSelect(index: number) {
+  if (index === store.activeGeneratedEntryIndex) return;
+  selectedSegIndex.value = null;
+  store.setActiveGeneratedEntry(index);
+  originalPanelRef.value?.scrollToLine(0);
+  generatedPanelRef.value?.scrollToLine(0);
+}
+
 function handleMappingClick(segment: MappingSegment) {
   store.setHoveredSegment(segment);
   selectSegment(segment);
@@ -246,46 +292,54 @@ async function handleShare() {
       @compare="handleCompare"
     />
 
-    <div v-if="ready" class="flex-1 flex overflow-hidden relative">
+    <div v-if="ready" class="flex-1 flex flex-col overflow-hidden relative">
       <SearchBar :visible="showSearch" @search="searchQuery = $event" @close="showSearch = false" />
+      <EntrypointTabs
+        v-if="store.generatedEntryCount > 1"
+        :entries="generatedTabs"
+        :active-index="store.activeGeneratedEntryIndex"
+        @select="handleGeneratedTabSelect"
+      />
 
-      <!-- Left: Original code -->
-      <div class="flex-1 flex flex-col border-r border-edge min-w-0">
-        <div class="px-3 py-1 text-xs font-medium text-fg-muted border-b border-edge bg-muted">
-          Original code
+      <div class="flex-1 flex overflow-hidden relative">
+        <!-- Left: Original code -->
+        <div class="flex-1 flex flex-col border-r border-edge min-w-0">
+          <div class="px-3 py-1 text-xs font-medium text-fg-muted border-b border-edge bg-muted">
+            Original code
+          </div>
+          <SourceTabs v-if="store.sourceCount > 1" />
+          <CodePanel
+            ref="originalPanelRef"
+            :code="store.activeSourceContent"
+            :filename="store.activeSourceName"
+            side="original"
+            :search-query="searchQuery"
+            class="flex-1"
+            @segment-click="handleOriginalSegmentClick"
+          />
         </div>
-        <SourceTabs v-if="store.sourceCount > 1" />
-        <CodePanel
-          ref="originalPanelRef"
-          :code="store.activeSourceContent"
-          :filename="store.activeSourceName"
-          side="original"
-          :search-query="searchQuery"
-          class="flex-1"
-          @segment-click="handleOriginalSegmentClick"
-        />
-      </div>
 
-      <!-- Right: Generated code -->
-      <div class="flex-1 flex flex-col min-w-0">
-        <div class="px-3 py-1 text-xs font-medium text-fg-muted border-b border-edge bg-muted">
-          Generated code
+        <!-- Right: Generated code -->
+        <div class="flex-1 flex flex-col min-w-0">
+          <div class="px-3 py-1 text-xs font-medium text-fg-muted border-b border-edge bg-muted">
+            Generated code
+          </div>
+          <CodePanel
+            ref="generatedPanelRef"
+            :code="store.generatedCode"
+            :filename="store.parsedData?.file ?? 'output.js'"
+            side="generated"
+            :search-query="searchQuery"
+            class="flex-1"
+            @segment-click="handleGeneratedSegmentClick"
+          />
         </div>
-        <CodePanel
-          ref="generatedPanelRef"
-          :code="store.generatedCode"
-          :filename="store.parsedData?.file ?? 'output.js'"
-          side="generated"
-          :search-query="searchQuery"
-          class="flex-1"
-          @segment-click="handleGeneratedSegmentClick"
-        />
+
+        <!-- Connector arrow overlay -->
+        <MappingConnector :original-panel="originalPanelRef" :generated-panel="generatedPanelRef" />
+
+        <StatsPanel v-if="showStats" />
       </div>
-
-      <!-- Connector arrow overlay -->
-      <MappingConnector :original-panel="originalPanelRef" :generated-panel="generatedPanelRef" />
-
-      <StatsPanel v-if="showStats" />
     </div>
 
     <StatusBar v-if="ready" @toggle-mappings="showMappings = !showMappings" />

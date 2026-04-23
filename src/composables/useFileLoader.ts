@@ -1,4 +1,9 @@
 import { decodeSourceMapDataUrl, extractInlineSourceMap } from "../core/parser";
+import {
+  resolveSourceMapFromFileCollection,
+  resolveSourceMapsFromFileCollection,
+  type ResolvedFileCollection,
+} from "../core/inputResolver";
 
 export interface LoadedFiles {
   generatedCode: string;
@@ -33,32 +38,36 @@ export function useFileLoader() {
     return null;
   }
 
-  async function loadFromFiles(files: File[]): Promise<LoadedFiles> {
-    let generatedCode = "";
-    let sourceMapJson = "";
+  async function readFileEntries(files: File[]) {
+    return Promise.all(
+      files.map(async (file) => {
+        const content = await file.text();
+        const relativePath =
+          "webkitRelativePath" in file && typeof file.webkitRelativePath === "string"
+            ? file.webkitRelativePath
+            : "";
+        return {
+          path: relativePath || file.name,
+          content,
+        };
+      }),
+    );
+  }
 
-    for (const file of files) {
-      const content = await file.text();
+  async function resolveFiles<T>(
+    files: File[],
+    resolver: (entries: Awaited<ReturnType<typeof readFileEntries>>) => T,
+  ): Promise<T> {
+    const entries = await readFileEntries(files);
+    return resolver(entries);
+  }
 
-      const parsed = parseInputText(content);
-      if (parsed) {
-        if (parsed.generatedCode) {
-          generatedCode = parsed.generatedCode;
-        }
-        sourceMapJson = parsed.sourceMapJson;
-        continue;
-      }
+  async function loadFileEntries(files: File[]): Promise<ResolvedFileCollection[]> {
+    return resolveFiles(files, resolveSourceMapsFromFileCollection);
+  }
 
-      generatedCode = content;
-    }
-
-    if (!sourceMapJson) {
-      throw new Error(
-        "No source map found. Upload a .map file or code with an inline sourceMappingURL.",
-      );
-    }
-
-    return { generatedCode, sourceMapJson };
+  async function loadFromFiles(files: File[]): Promise<ResolvedFileCollection> {
+    return resolveFiles(files, resolveSourceMapFromFileCollection);
   }
 
   async function loadFromText(text: string): Promise<LoadedFiles> {
@@ -131,5 +140,5 @@ export function useFileLoader() {
     throw new Error("Could not find a source map at the provided URL.");
   }
 
-  return { loadFromFiles, loadFromText, loadFromUrl };
+  return { loadFileEntries, loadFromFiles, loadFromText, loadFromUrl };
 }

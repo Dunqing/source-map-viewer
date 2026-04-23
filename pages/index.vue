@@ -18,8 +18,9 @@ function getSlugFromUrl(): string {
 async function handleNavigation() {
   const slug = getSlugFromUrl();
   if (slug) {
-    if (slug === currentSlug && store.parsedData) {
+    if ((slug === currentSlug || slug === store.sessionSlug) && store.parsedData) {
       // Same slug already loaded — skip redundant fetch
+      currentSlug = slug;
     } else {
       currentSlug = slug;
       const data = await resolveSlug(slug);

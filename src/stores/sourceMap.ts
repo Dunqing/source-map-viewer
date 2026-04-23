@@ -1,4 +1,5 @@
 import { computed, reactive, ref, shallowRef } from "vue";
+import type { ResolvedFileCollection } from "../core/inputResolver";
 import type {
   InverseMappingIndex,
   MappingDiagnostic,
@@ -15,6 +16,10 @@ import { calculateStats } from "../core/stats";
 function createSourceMapStore() {
   const generatedCode = ref("");
   const sourceMapJson = ref("");
+  const generatedEntries = shallowRef<ResolvedFileCollection[]>([]);
+  const activeGeneratedEntryIndex = ref(0);
+  const sessionSlug = ref("");
+  const sessionLabel = ref("");
   const parsedData = shallowRef<SourceMapData | null>(null);
   const mappingIndex = shallowRef<MappingIndex>([]);
   const inverseMappingIndex = shallowRef<InverseMappingIndex>(new Map());
@@ -35,6 +40,10 @@ function createSourceMapStore() {
     return parsedData.value.sources[activeSourceIndex.value] ?? "";
   });
 
+  const activeGeneratedEntry = computed(
+    () => generatedEntries.value[activeGeneratedEntryIndex.value] ?? null,
+  );
+  const generatedEntryCount = computed(() => generatedEntries.value.length);
   const sourceCount = computed(() => parsedData.value?.sources.length ?? 0);
 
   const badSegmentSet = computed(
@@ -72,7 +81,7 @@ function createSourceMapStore() {
     return set;
   });
 
-  function loadSourceMap(code: string, mapJson: string) {
+  function applySourceMap(code: string, mapJson: string) {
     try {
       error.value = null;
       generatedCode.value = code;
@@ -89,6 +98,7 @@ function createSourceMapStore() {
       void splitTokenSegmentSet.value;
       activeSourceIndex.value = 0;
       hoveredSegment.value = null;
+      return true;
     } catch (e) {
       error.value = e instanceof Error ? e.message : "Failed to parse source map";
       parsedData.value = null;
@@ -96,7 +106,36 @@ function createSourceMapStore() {
       inverseMappingIndex.value = new Map();
       diagnostics.value = [];
       stats.value = null;
+      hoveredSegment.value = null;
+      return false;
     }
+  }
+
+  function loadSourceMap(code: string, mapJson: string) {
+    generatedEntries.value = [];
+    activeGeneratedEntryIndex.value = 0;
+    sessionSlug.value = "";
+    sessionLabel.value = "";
+    applySourceMap(code, mapJson);
+  }
+
+  function loadSourceMapCollection(
+    entries: ResolvedFileCollection[],
+    activeIndex = 0,
+    slug = "",
+    label = "",
+  ) {
+    generatedEntries.value = entries;
+    sessionSlug.value = slug;
+    sessionLabel.value = label;
+    setActiveGeneratedEntry(activeIndex);
+  }
+
+  function setActiveGeneratedEntry(index: number) {
+    if (index < 0 || index >= generatedEntries.value.length) return;
+    activeGeneratedEntryIndex.value = index;
+    const entry = generatedEntries.value[index];
+    applySourceMap(entry.generatedCode, entry.sourceMapJson);
   }
 
   function setActiveSource(index: number) {
@@ -136,6 +175,10 @@ function createSourceMapStore() {
     cancelPendingHoverSourceSync();
     generatedCode.value = "";
     sourceMapJson.value = "";
+    generatedEntries.value = [];
+    activeGeneratedEntryIndex.value = 0;
+    sessionSlug.value = "";
+    sessionLabel.value = "";
     parsedData.value = null;
     mappingIndex.value = [];
     inverseMappingIndex.value = new Map();
@@ -149,6 +192,12 @@ function createSourceMapStore() {
   return {
     generatedCode,
     sourceMapJson,
+    generatedEntries,
+    activeGeneratedEntryIndex,
+    activeGeneratedEntry,
+    generatedEntryCount,
+    sessionSlug,
+    sessionLabel,
     parsedData,
     mappingIndex,
     inverseMappingIndex,
@@ -164,6 +213,8 @@ function createSourceMapStore() {
     splitTokenSegmentSet,
     clampedSegmentSet,
     loadSourceMap,
+    loadSourceMapCollection,
+    setActiveGeneratedEntry,
     setActiveSource,
     setHoveredSegment,
     reset,

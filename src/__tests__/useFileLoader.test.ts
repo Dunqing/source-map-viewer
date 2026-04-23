@@ -25,12 +25,19 @@ ${JS_SOURCE_MAP_DIRECTIVE}data:application/json;base64,${btoa(VALID_SOURCE_MAP_J
 const SOURCE_MAP_DATA_URL = `data:application/json;charset=utf-8;base64,${btoa(VALID_SOURCE_MAP_JSON)}`;
 
 // Helper to create a File object
-function createFile(name: string, content: string): File {
-  return new File([content], name, { type: "text/plain" });
+function createFile(name: string, content: string, relativePath?: string): File {
+  const file = new File([content], name, { type: "text/plain" });
+  if (relativePath) {
+    Object.defineProperty(file, "webkitRelativePath", {
+      configurable: true,
+      value: relativePath,
+    });
+  }
+  return file;
 }
 
 describe("useFileLoader", () => {
-  const { loadFromFiles, loadFromText, loadFromUrl } = useFileLoader();
+  const { loadFileEntries, loadFromFiles, loadFromText, loadFromUrl } = useFileLoader();
 
   describe("loadFromFiles", () => {
     it("loads from separate .js and .map files", async () => {
@@ -41,6 +48,63 @@ describe("useFileLoader", () => {
 
       expect(result.generatedCode).toBe(GENERATED_CODE);
       expect(result.sourceMapJson).toBe(VALID_SOURCE_MAP_JSON);
+    });
+
+    it("loads from a folder upload and hydrates missing sourcesContent", async () => {
+      const mapWithoutSourcesContent = JSON.stringify({
+        ...VALID_SOURCE_MAP,
+        sources: ["../src/input.ts"],
+        sourcesContent: undefined,
+      });
+      const jsFile = createFile(
+        "bundle.js",
+        `${GENERATED_CODE}\n//# sourceMappingURL=bundle.js.map`,
+        "demo/dist/bundle.js",
+      );
+      const mapFile = createFile(
+        "bundle.js.map",
+        mapWithoutSourcesContent,
+        "demo/dist/bundle.js.map",
+      );
+      const sourceFile = createFile(
+        "input.ts",
+        "const x = 1;\nconsole.log(x);",
+        "demo/src/input.ts",
+      );
+
+      const result = await loadFromFiles([jsFile, mapFile, sourceFile]);
+      const parsed = JSON.parse(result.sourceMapJson);
+
+      expect(result.generatedCode).toContain("var x = 1;");
+      expect(parsed.sources).toEqual(["../src/input.ts"]);
+      expect(parsed.sourcesContent).toEqual(["const x = 1;\nconsole.log(x);"]);
+      expect(result.label).toBe("bundle.js");
+    });
+
+    it("returns all entrypoints from a multi-bundle folder upload", async () => {
+      const alphaMap = createFile(
+        "alpha.js.map",
+        JSON.stringify({
+          ...VALID_SOURCE_MAP,
+          file: "js/alpha.js",
+        }),
+        "demo/maps/alpha.js.map",
+      );
+      const betaMap = createFile(
+        "beta.js.map",
+        JSON.stringify({
+          ...VALID_SOURCE_MAP,
+          file: "js/beta.js",
+        }),
+        "demo/maps/beta.js.map",
+      );
+      const alphaFile = createFile("alpha.js", "console.log('alpha');", "demo/js/alpha.js");
+      const betaFile = createFile("beta.js", "console.log('beta');", "demo/js/beta.js");
+
+      const results = await loadFileEntries([betaMap, betaFile, alphaMap, alphaFile]);
+
+      expect(results.map((result) => result.entryPath)).toEqual(["js/alpha.js", "js/beta.js"]);
+      expect(results.map((result) => result.label)).toEqual(["alpha.js", "beta.js"]);
     });
 
     it("loads from .map file only", async () => {

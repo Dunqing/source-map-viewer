@@ -46,6 +46,19 @@ describe("useHistory", () => {
     expect(result.entries.value[0].timestamp).toBe(3000);
   });
 
+  it("deduplicates query variants by base slug", () => {
+    const { result } = withSetup(useHistory);
+    result.addEntry({ label: "alpha", slug: "folder-slug", timestamp: 1000 });
+    result.addEntry({ label: "beta", slug: "folder-slug?entry=1", timestamp: 2000 });
+
+    expect(result.entries.value).toHaveLength(1);
+    expect(result.entries.value[0]).toEqual({
+      label: "beta",
+      slug: "folder-slug?entry=1",
+      timestamp: 2000,
+    });
+  });
+
   it("caps at 5 entries", () => {
     const { result } = withSetup(useHistory);
     for (let i = 0; i < 7; i++) {
@@ -64,11 +77,14 @@ describe("useHistory", () => {
   });
 
   it("loads from localStorage on init", () => {
-    const data: HistoryEntry[] = [{ label: "loaded", slug: "def", timestamp: 5000 }];
+    const data: HistoryEntry[] = [
+      { label: "loaded", slug: "def", timestamp: 5000, sessionLabel: "demo" },
+    ];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     const { result } = withSetup(useHistory);
     expect(result.entries.value).toHaveLength(1);
     expect(result.entries.value[0].label).toBe("loaded");
+    expect(result.entries.value[0].sessionLabel).toBe("demo");
   });
 
   it("migrates legacy hash entries from localStorage", () => {

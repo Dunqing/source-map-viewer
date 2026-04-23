@@ -1,24 +1,31 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import IconUpload from "~icons/carbon/upload";
+import IconChevronDown from "~icons/carbon/chevron-down";
 import IconPaste from "~icons/carbon/paste";
 import IconLink from "~icons/carbon/link";
 import IconCircleDash from "~icons/carbon/circle-dash";
 import IconLogoGithub from "~icons/carbon/logo-github";
 import IconTrashCan from "~icons/carbon/trash-can";
 import IconArrowRight from "~icons/carbon/arrow-right";
+import type { ResolvedFileCollection } from "../core/inputResolver";
 import { useSourceMapStore } from "../stores/sourceMap";
 import { useFileLoader } from "../composables/useFileLoader";
+import { formatMultiEntryHistoryLabel } from "../composables/historyLabels";
 import { compressToHash } from "../composables/useShareableUrl";
 import { useTheme } from "../composables/useTheme";
 import { useHistory } from "../composables/useHistory";
+import {
+  cacheSessionCollection,
+  getCachedSessionCollection,
+} from "../composables/useSessionCollectionCache";
 import { exampleSources, type ExampleSource } from "../examples";
 import { APP_NAME } from "../constants";
 import FileDropZone from "../components/FileDropZone.vue";
 import ExamplePreview from "../components/ExamplePreview.vue";
 
 const store = useSourceMapStore();
-const { loadFromFiles, loadFromText, loadFromUrl } = useFileLoader();
+const { loadFileEntries, loadFromText, loadFromUrl } = useFileLoader();
 const {
   entries: historyEntries,
   loading: historyLoading,
@@ -29,17 +36,59 @@ useTheme();
 
 const showPaste = ref(false);
 const showUrl = ref(false);
+const showUploadMenu = ref(false);
 const pasteContent = ref("");
 const urlInput = ref("");
 const error = ref<string | null>(null);
 const loading = ref(false);
+const uploadMenuRef = ref<HTMLElement | null>(null);
 
-async function navigateWithData(generatedCode: string, sourceMapJson: string, label: string) {
-  store.loadSourceMap(generatedCode, sourceMapJson);
-  if (store.error) throw new Error(store.error);
+function getPrimaryEntry(entries: ResolvedFileCollection[]): ResolvedFileCollection {
+  const entry = entries[0];
+  if (!entry) {
+    throw new Error("No source map entrypoints found.");
+  }
+  return entry;
+}
 
-  // Create a short URL via API, fall back to an inline compressed slug.
-  let path: string;
+function getUploadRootLabel(files: File[]): string | null {
+  const relativePaths = files
+    .map((file) =>
+      "webkitRelativePath" in file && typeof file.webkitRelativePath === "string"
+        ? file.webkitRelativePath
+        : "",
+    )
+    .filter(Boolean);
+
+  if (relativePaths.length !== files.length || relativePaths.length === 0) {
+    return null;
+  }
+
+  const firstSegment = relativePaths[0]?.split("/")[0];
+  if (!firstSegment) return null;
+
+  return relativePaths.every((path) => path.split("/")[0] === firstSegment) ? firstSegment : null;
+}
+
+function getHistoryLabel(
+  label: string,
+  sessionEntries?: ResolvedFileCollection[],
+  sessionLabel?: string,
+  activeIndex = 0,
+): string {
+  if (!sessionEntries || sessionEntries.length <= 1) {
+    return label;
+  }
+
+  const activeEntry = sessionEntries[activeIndex];
+  return formatMultiEntryHistoryLabel(
+    sessionLabel ?? label,
+    activeEntry?.entryPath ?? activeEntry?.label ?? "",
+    sessionEntries.length,
+  );
+}
+
+async function createSharePath(generatedCode: string, sourceMapJson: string): Promise<string> {
   try {
     const res = await fetch("/api/share", {
       method: "POST",
@@ -48,13 +97,35 @@ async function navigateWithData(generatedCode: string, sourceMapJson: string, la
     });
     if (!res.ok) throw new Error();
     const { id } = await res.json();
-    path = `/${id}`;
+    return `/${id}`;
   } catch {
     const slug = await compressToHash({ generatedCode, sourceMapJson });
-    path = `/${slug}`;
+    return `/${slug}`;
   }
+}
 
-  addHistoryEntry({ label, slug: path.slice(1), timestamp: Date.now() });
+async function navigateWithData(
+  data: { generatedCode: string; sourceMapJson: string },
+  label: string,
+  sessionEntries?: ResolvedFileCollection[],
+  sessionLabel?: string,
+) {
+  const path = await createSharePath(data.generatedCode, data.sourceMapJson);
+  if (sessionEntries && sessionEntries.length > 1) {
+    const slug = path.slice(1);
+    cacheSessionCollection(slug, sessionEntries);
+    store.loadSourceMapCollection(sessionEntries, 0, slug, sessionLabel ?? label);
+  } else {
+    store.loadSourceMap(data.generatedCode, data.sourceMapJson);
+  }
+  if (store.error) throw new Error(store.error);
+
+  addHistoryEntry({
+    label: getHistoryLabel(label, sessionEntries, sessionLabel),
+    slug: path.slice(1),
+    timestamp: Date.now(),
+    sessionLabel,
+  });
   window.history.pushState(null, "", path);
   window.dispatchEvent(new CustomEvent("smv-navigate"));
 }
@@ -63,9 +134,12 @@ async function handleFiles(files: File[]) {
   try {
     error.value = null;
     loading.value = true;
-    const result = await loadFromFiles(files);
-    const label = files.map((f) => f.name).join(" + ");
-    await navigateWithData(result.generatedCode, result.sourceMapJson, label);
+    const results = await loadFileEntries(files);
+    const primaryEntry = getPrimaryEntry(results);
+    const label = primaryEntry.label ?? files.map((f) => f.name).join(" + ");
+    const sessionLabel =
+      results.length > 1 ? (getUploadRootLabel(files) ?? "Build folder") : undefined;
+    await navigateWithData(primaryEntry, label, results, sessionLabel);
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load files";
   } finally {
@@ -78,7 +152,7 @@ async function handlePaste() {
     error.value = null;
     loading.value = true;
     const result = await loadFromText(pasteContent.value);
-    await navigateWithData(result.generatedCode, result.sourceMapJson, "Pasted code");
+    await navigateWithData(result, "Pasted code");
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to parse pasted content";
   } finally {
@@ -96,7 +170,7 @@ async function handleUrl() {
       parsedUrl.protocol === "data:"
         ? "data:application/json"
         : parsedUrl.pathname.split("/").pop() || urlInput.value;
-    await navigateWithData(result.generatedCode, result.sourceMapJson, label);
+    await navigateWithData(result, label);
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to fetch URL";
   } finally {
@@ -107,28 +181,69 @@ async function handleUrl() {
 async function loadExample(source: ExampleSource, transformer: string) {
   const data = source.transformers[transformer];
   if (!data) return;
-  await navigateWithData(data.generatedCode, data.sourceMapJson, `${source.name} · ${transformer}`);
+  await navigateWithData(
+    data.entries?.[0] ?? data,
+    `${source.name} · ${transformer}`,
+    data.entries,
+    data.entries ? `${source.name} · ${transformer}` : undefined,
+  );
 }
 
-function loadFromHistory(entry: { slug: string }) {
-  window.history.pushState(null, "", `/${entry.slug}`);
+function loadFromHistory(entry: { slug: string; sessionLabel?: string }) {
+  const url = new URL(`/${entry.slug}`, window.location.origin);
+  const slug = url.pathname.slice(1);
+  const cachedEntries = getCachedSessionCollection(slug);
+  if (cachedEntries) {
+    const entryIndex = Number(url.searchParams.get("entry"));
+    store.loadSourceMapCollection(
+      cachedEntries,
+      Number.isFinite(entryIndex) ? entryIndex : 0,
+      slug,
+      entry.sessionLabel,
+    );
+  }
+  window.history.pushState(null, "", `${url.pathname}${url.search}`);
   window.dispatchEvent(new CustomEvent("smv-navigate"));
 }
 
-function openFileDialog() {
+function openUploadDialog(mode: "files" | "folder") {
   const input = document.createElement("input");
   input.type = "file";
   input.multiple = true;
   input.accept = ".js,.ts,.css,.map,.json";
+  if (mode === "folder") {
+    input.setAttribute("webkitdirectory", "");
+    input.setAttribute("directory", "");
+  }
   input.onchange = () => {
     if (input.files) handleFiles(Array.from(input.files));
   };
   input.click();
 }
 
+function selectUploadMode(mode: "files" | "folder") {
+  showUploadMenu.value = false;
+  openUploadDialog(mode);
+}
+
+function handleDocumentPointerDown(event: MouseEvent) {
+  if (!showUploadMenu.value) return;
+  if (!(event.target instanceof Node)) return;
+  if (uploadMenuRef.value?.contains(event.target)) return;
+  showUploadMenu.value = false;
+}
+
+onMounted(() => {
+  document.addEventListener("mousedown", handleDocumentPointerDown);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("mousedown", handleDocumentPointerDown);
+});
+
 function getFirstGeneratedCode(source: ExampleSource): string {
   const first = Object.values(source.transformers)[0];
-  return first?.generatedCode ?? "";
+  return first?.entries?.[0]?.generatedCode ?? first?.generatedCode ?? "";
 }
 
 function formatTimeAgo(timestamp: number): string {
@@ -171,24 +286,57 @@ function formatTimeAgo(timestamp: number): string {
 
       <!-- Drop Zone -->
       <div class="rounded-xl border-2 border-dashed border-edge bg-surface p-6 text-center">
-        <p class="text-sm text-fg-muted mb-3">
-          Drop your
-          <code class="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">.js</code>
-          <code class="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">.ts</code>
-          <code class="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">.css</code>
-          or
-          <code class="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">.map</code>
-          <code class="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">.json</code>
-          files here
-        </p>
-        <div class="flex items-center justify-center gap-2">
-          <button
-            class="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-edge text-sm text-fg-dim hover:bg-surface transition"
-            @click="openFileDialog"
-          >
-            <IconUpload class="w-4 h-4" />
-            Upload
-          </button>
+        <div class="mb-3 space-y-1">
+          <p class="text-sm text-fg-muted">
+            Drop generated code, source maps, or a build folder here
+          </p>
+          <p class="text-xs text-fg-muted">
+            Supports
+            <code class="font-mono bg-muted px-1.5 py-0.5 rounded">.js</code>,
+            <code class="font-mono bg-muted px-1.5 py-0.5 rounded">.ts</code>,
+            <code class="font-mono bg-muted px-1.5 py-0.5 rounded">.css</code>,
+            <code class="font-mono bg-muted px-1.5 py-0.5 rounded">.map</code>, and
+            <code class="font-mono bg-muted px-1.5 py-0.5 rounded">.json</code>
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <div ref="uploadMenuRef" class="relative">
+            <button
+              class="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-edge text-sm text-fg-dim hover:bg-surface transition"
+              :aria-expanded="showUploadMenu"
+              @click="showUploadMenu = !showUploadMenu"
+            >
+              <IconUpload class="w-4 h-4" />
+              Upload
+              <IconChevronDown
+                class="w-4 h-4 transition-transform"
+                :class="showUploadMenu ? 'rotate-180' : ''"
+              />
+            </button>
+            <div
+              v-if="showUploadMenu"
+              class="absolute left-0 top-full z-10 mt-2 min-w-[13rem] rounded-lg border border-edge bg-panel p-1.5 shadow-lg"
+            >
+              <button
+                class="block w-full rounded-md px-3 py-2 text-left hover:bg-surface transition"
+                @click="selectUploadMode('files')"
+              >
+                <span class="block text-sm text-fg">Files</span>
+                <span class="mt-0.5 block text-xs leading-tight text-fg-muted">
+                  Pick individual generated files and source maps
+                </span>
+              </button>
+              <button
+                class="block w-full rounded-md px-3 py-2 text-left hover:bg-surface transition"
+                @click="selectUploadMode('folder')"
+              >
+                <span class="block text-sm text-fg">Folder</span>
+                <span class="mt-0.5 block text-xs leading-tight text-fg-muted">
+                  Load every bundle in a build folder with its relative paths
+                </span>
+              </button>
+            </div>
+          </div>
           <button
             class="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-edge text-sm text-fg-dim hover:bg-surface transition"
             @click="
@@ -299,6 +447,7 @@ function formatTimeAgo(timestamp: number): string {
           <div
             v-for="source in exampleSources"
             :key="source.name"
+            :data-example-name="source.name"
             class="flex items-center gap-3 rounded-lg border border-edge bg-surface p-3 hover:bg-surface transition"
           >
             <ExamplePreview :code="getFirstGeneratedCode(source)" />
@@ -311,6 +460,7 @@ function formatTimeAgo(timestamp: number): string {
                 <button
                   v-for="transformer in Object.keys(source.transformers)"
                   :key="transformer"
+                  :data-transformer="transformer"
                   class="rounded px-2 py-0.5 text-xs font-mono bg-muted text-fg-dim hover:bg-muted transition"
                   @click="loadExample(source, transformer)"
                 >

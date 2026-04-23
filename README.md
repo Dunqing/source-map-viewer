@@ -5,6 +5,7 @@ A visual tool for inspecting, comparing, and sharing JavaScript/CSS source maps.
 ## Features
 
 - **Flexible input loading** — upload generated code plus `.map`, paste raw source map JSON or generated code with inline `sourceMappingURL`, open `data:application/json` payloads, or fetch public HTTP(S) URLs
+- **Folder-aware loading** — upload a build/output folder to preserve relative paths, auto-pair an unambiguous generated file with its source map, and hydrate missing `sourcesContent` from sibling source files
 - **Interactive mapping viewer** — hover or click any mapped segment to highlight both sides, follow the SVG connector, and keep original/generated panels in sync
 - **Multi-source navigation** — switch between source files with tabs when a source map contains multiple inputs
 - **Search and deep links** — search visible code with `Cmd/Ctrl+F`, then share links that preserve the selected source tab, stats panel, and a specific mapping via `?tab=`, `?stats=1`, and `?seg=`
@@ -62,10 +63,11 @@ Deep-link query params also work on viewer URLs:
 
 ## CLI
 
-Use `vp dlx` in a Vite+ workspace, or `npx` elsewhere:
+Use `vp dlx` in a Vite+ workspace, or `npx` elsewhere. You can pass either a file path or a folder that contains exactly one unambiguous source map entrypoint:
 
 ```bash
 vp dlx source-map-viewer bundle.js                          # open visualization in browser
+vp dlx source-map-viewer dist/                             # scan a folder and open the only source map pair
 vp dlx source-map-viewer bundle.js --url                    # print shareable URL
 vp dlx source-map-viewer bundle.js --ai                     # print AI debug report to stdout
 vp dlx source-map-viewer bundle.js --copy                   # copy the shared URL
@@ -79,7 +81,7 @@ npx source-map-viewer bundle.js --ai
 npx source-map-viewer compare before.js after.js --url
 ```
 
-The CLI auto-detects source maps from inline `sourceMappingURL` comments, external `.map` references, or sibling `.map` files. You can also pass a `.map` or `.json` file directly. The `compare` subcommand accepts the same inputs on both sides and can emit either a browser URL or an offline markdown diff report.
+The CLI auto-detects source maps from inline `sourceMappingURL` comments, external `.map` references, sibling `.map` files, or folder scans with preserved relative paths. You can also pass a `.map` or `.json` file directly. When the folder also contains original sources, missing `sourcesContent` entries are filled from disk before rendering. The `compare` subcommand accepts the same inputs on both sides and can emit either a browser URL or an offline markdown diff report.
 
 Useful flags:
 

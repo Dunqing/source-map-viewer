@@ -94,6 +94,49 @@ describe("resolveFile", () => {
     expect(result.label).toBe("output.js.map");
   });
 
+  it("resolves an unambiguous directory and hydrates missing sourcesContent", () => {
+    const distDir = join(FIXTURE_DIR, "demo", "dist");
+    const srcDir = join(FIXTURE_DIR, "demo", "src");
+    mkdirSync(distDir, { recursive: true });
+    mkdirSync(srcDir, { recursive: true });
+
+    const code = "var a=1;\n//# sourceMappingURL=bundle.js.map";
+    const mapWithoutSourcesContent = JSON.stringify({
+      version: 3,
+      sources: ["../src/input.ts"],
+      names: [],
+      mappings: "AAAA",
+      file: "bundle.js",
+    });
+
+    writeFileSync(join(distDir, "bundle.js"), code);
+    writeFileSync(join(distDir, "bundle.js.map"), mapWithoutSourcesContent);
+    writeFileSync(join(srcDir, "input.ts"), "const a = 1;");
+
+    const result = resolveFile(join(FIXTURE_DIR, "demo"));
+    const parsed = JSON.parse(result.sourceMapJson);
+
+    expect(result.label).toBe("bundle.js");
+    expect(result.generatedCode).toBe(code);
+    expect(parsed.sourcesContent).toEqual(["const a = 1;"]);
+  });
+
+  it("throws on ambiguous directory input", () => {
+    const alphaDir = join(FIXTURE_DIR, "multi", "alpha");
+    const betaDir = join(FIXTURE_DIR, "multi", "beta");
+    mkdirSync(alphaDir, { recursive: true });
+    mkdirSync(betaDir, { recursive: true });
+
+    writeFileSync(join(alphaDir, "a.js"), "var a=1;\n//# sourceMappingURL=a.js.map");
+    writeFileSync(join(alphaDir, "a.js.map"), SIMPLE_MAP);
+    writeFileSync(join(betaDir, "b.js"), "var b=1;\n//# sourceMappingURL=b.js.map");
+    writeFileSync(join(betaDir, "b.js.map"), SIMPLE_MAP);
+
+    expect(() => resolveFile(join(FIXTURE_DIR, "multi"))).toThrow(
+      "Multiple source map entrypoints",
+    );
+  });
+
   it("throws on missing file", () => {
     const filePath = join(FIXTURE_DIR, "nonexistent.js");
 
