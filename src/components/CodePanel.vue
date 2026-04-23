@@ -14,7 +14,7 @@ import { useTheme } from "../composables/useTheme";
 import IconCopy from "~icons/carbon/copy";
 import IconCheckmark from "~icons/carbon/checkmark";
 import type { MappingSegment } from "../core/types";
-import type { ThemedToken } from "shiki/core";
+import type { HighlightedToken, WhitespaceKind } from "../composables/useHighlighter";
 
 const copied = ref(false);
 
@@ -69,7 +69,7 @@ function onVirtualScroll(e: Event) {
   positionCache.clear();
 }
 
-const allTokens = computed<ThemedToken[][]>(() => {
+const allTokens = computed<HighlightedToken[][]>(() => {
   if (!props.code) return [];
   void resolvedTheme.value; // explicit dependency — re-tokenize on theme change
   const lang = detectLanguage(props.filename);
@@ -140,68 +140,6 @@ interface RenderSpan {
   whitespaceKind: WhitespaceKind | null;
 }
 
-type WhitespaceKind = "space" | "tab";
-type BaseRenderSpan = Omit<RenderSpan, "text" | "whitespaceKind">;
-
-function getWhitespaceKind(char: string): WhitespaceKind | null {
-  if (char === " ") return "space";
-  if (char === "\t") return "tab";
-  return null;
-}
-
-function getWhitespaceMarker(kind: WhitespaceKind): string {
-  return kind === "space" ? "·" : "⇥";
-}
-
-function splitWhitespaceRuns(text: string, base: BaseRenderSpan): RenderSpan[] {
-  if (!text) return [];
-
-  const spans: RenderSpan[] = [];
-  let start = 0;
-
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    const whitespaceKind = getWhitespaceKind(char);
-    if (!whitespaceKind) continue;
-
-    if (start < i) {
-      spans.push({
-        ...base,
-        text: text.slice(start, i),
-        whitespaceKind: null,
-      });
-    }
-
-    spans.push({
-      ...base,
-      text: char,
-      whitespaceKind,
-    });
-    start = i + 1;
-  }
-
-  if (start < text.length) {
-    spans.push({
-      ...base,
-      text: text.slice(start),
-      whitespaceKind: null,
-    });
-  }
-
-  return spans;
-}
-
-function makeRenderSpans(parts: Array<{ text: string } & BaseRenderSpan>): RenderSpan[] {
-  return parts.flatMap((part) =>
-    splitWhitespaceRuns(part.text, {
-      textColor: part.textColor,
-      colorIndex: part.colorIndex,
-      segment: part.segment,
-      isBad: part.isBad,
-    }),
-  );
-}
-
 const searchMatchLines = computed(() => {
   const set = new Set<number>();
   const q = props.searchQuery;
@@ -231,28 +169,26 @@ const visibleLineSpans = computed<RenderSpan[][]>(() => {
     if (!mappingsOnLine || mappingsOnLine.length === 0) {
       if (shikiTokens.length > 0) {
         result.push(
-          makeRenderSpans(
-            shikiTokens.map((t) => ({
-              text: t.content,
-              textColor: t.color,
-              colorIndex: null,
-              segment: null,
-              isBad: false,
-            })),
-          ),
+          shikiTokens.map((t) => ({
+            text: t.content,
+            textColor: t.color,
+            colorIndex: null,
+            segment: null,
+            isBad: false,
+            whitespaceKind: t.whitespaceKind,
+          })),
         );
       } else {
-        result.push(
-          makeRenderSpans([
-            {
-              text: lineText,
-              textColor: undefined,
-              colorIndex: null,
-              segment: null,
-              isBad: false,
-            },
-          ]),
-        );
+        result.push([
+          {
+            text: lineText,
+            textColor: undefined,
+            colorIndex: null,
+            segment: null,
+            isBad: false,
+            whitespaceKind: null,
+          },
+        ]);
       }
       continue;
     }
@@ -301,7 +237,7 @@ const visibleLineSpans = computed<RenderSpan[][]>(() => {
             colorIndex: currentSeg ? getSegmentColorIndex(currentSeg) : null,
             segment: currentSeg,
             isBad: currentSeg ? store.badSegmentSet.has(currentSeg) : false,
-            whitespaceKind: null,
+            whitespaceKind: token.whitespaceKind,
           });
           pos = segEnd;
         }
@@ -328,17 +264,7 @@ const visibleLineSpans = computed<RenderSpan[][]>(() => {
       }
     }
 
-    result.push(
-      makeRenderSpans(
-        spans.map(({ text, textColor, colorIndex, segment, isBad }) => ({
-          text,
-          textColor,
-          colorIndex,
-          segment,
-          isBad,
-        })),
-      ),
-    );
+    result.push(spans);
   }
 
   return result;
@@ -417,23 +343,6 @@ onUnmounted(() => {
 // Position cache — cleared on scroll to avoid stale values in the rAF loop
 const positionCache = new Map<string, { x: number; y: number; top: number; height: number }>();
 
-function clearPositionCache() {
-  positionCache.clear();
-}
-
-function getTextNodeForMeasurement(span: Element): Text | null {
-  const measure = span.querySelector(".whitespace-measure");
-  if (measure?.firstChild?.nodeType === Node.TEXT_NODE) {
-    return measure.firstChild as Text;
-  }
-  for (const node of span.childNodes) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return node as Text;
-    }
-  }
-  return null;
-}
-
 function getViewportPosition(
   line: number,
   column: number,
@@ -453,8 +362,8 @@ function getViewportPosition(
   const codeSpans = lineEl.querySelectorAll("span.whitespace-pre > span");
   let remaining = column;
   for (const span of codeSpans) {
-    const textNode = getTextNodeForMeasurement(span);
-    if (!textNode) continue;
+    const textNode = span.firstChild;
+    if (!textNode || textNode.nodeType !== Node.TEXT_NODE) continue;
     const len = textNode.textContent!.length;
     if (remaining <= len) {
       const range = document.createRange();
@@ -568,15 +477,7 @@ defineExpose({
                   'explicit-tab': span.whitespaceKind === 'tab',
                 }"
                 @mouseenter="handleSegmentHover(span.segment)"
-              >
-                <template v-if="span.whitespaceKind">
-                  <!-- Keep the real whitespace in the DOM for measurement and copy/selection. -->
-                  <span class="whitespace-measure">{{ span.text }}</span>
-                  <span class="whitespace-marker" aria-hidden="true">{{
-                    getWhitespaceMarker(span.whitespaceKind)
-                  }}</span>
-                </template>
-                <template v-else>{{ span.text }}</template></span
+                >{{ span.text }}</span
               >
             </span>
           </div>
@@ -592,24 +493,32 @@ defineExpose({
 }
 
 .explicit-whitespace {
-  display: inline-grid;
-  place-items: center;
+  position: relative;
+  display: inline-block;
   vertical-align: baseline;
+  color: transparent !important;
 }
 
-.whitespace-measure {
-  grid-area: 1 / 1;
-  visibility: hidden;
-}
-
-.whitespace-marker {
-  grid-area: 1 / 1;
+.explicit-whitespace::before {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   user-select: none;
   pointer-events: none;
   opacity: 0.8;
   color: #64748b;
   font-size: 0.9em;
   line-height: 1;
+}
+
+.explicit-space::before {
+  content: "·";
+}
+
+.explicit-tab::before {
+  content: "⇥";
 }
 
 .unmapped-original {

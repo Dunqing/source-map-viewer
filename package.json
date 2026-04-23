@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@shikijs/markdown-it": "^4.0.2",
+    "@shikijs/transformers": "^4.0.2",
     "markdown-it": "^14.1.1",
     "shiki": "^4.0.2",
     "source-map-js": "^1.2.1",

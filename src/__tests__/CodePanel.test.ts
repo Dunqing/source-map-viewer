@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import CodePanel from "../components/CodePanel.vue";
+import { useHighlighter } from "../composables/useHighlighter";
 import { useSourceMapStore } from "../stores/sourceMap";
 
 class ResizeObserverMock {
@@ -25,7 +26,8 @@ describe("CodePanel", () => {
     );
   });
 
-  it("renders explicit whitespace markers while preserving the underlying whitespace nodes", async () => {
+  it("renders explicit whitespace classes while preserving the underlying whitespace nodes", async () => {
+    await useHighlighter().init();
     const wrapper = mount(CodePanel, {
       props: {
         code: "a  \tb",
@@ -38,15 +40,12 @@ describe("CodePanel", () => {
 
     expect(wrapper.findAll(".explicit-space")).toHaveLength(2);
     expect(wrapper.findAll(".explicit-tab")).toHaveLength(1);
-    expect(wrapper.findAll(".whitespace-measure").map((node) => node.element.textContent)).toEqual([
+    expect(wrapper.findAll(".explicit-space").map((node) => node.element.textContent)).toEqual([
       " ",
       " ",
-      "\t",
     ]);
-    expect(wrapper.findAll(".whitespace-marker").map((node) => node.element.textContent)).toEqual([
-      "·",
-      "·",
-      "⇥",
+    expect(wrapper.findAll(".explicit-tab").map((node) => node.element.textContent)).toEqual([
+      "\t",
     ]);
   });
 });

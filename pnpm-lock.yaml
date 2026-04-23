@@ -21,6 +21,9 @@ importers:
       '@shikijs/markdown-it':
         specifier: ^4.0.2
         version: 4.0.2
+      '@shikijs/transformers':
+        specifier: ^4.0.2
+        version: 4.0.2
       markdown-it:
         specifier: ^14.1.1
         version: 14.1.1
@@ -4711,7 +4714,6 @@ snapshots:
     dependencies:
       '@shikijs/core': 4.0.2
       '@shikijs/types': 4.0.2
-    optional: true
 
   '@shikijs/types@4.0.2':
     dependencies:
