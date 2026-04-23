@@ -12,7 +12,7 @@ A visual tool for inspecting, comparing, and sharing JavaScript/CSS source maps.
 - **Mappings table and export** — inspect every mapping with filtering by position, snippet, source, or name, and copy the table as Markdown
 - **Validation and quality analysis** — catch invalid mappings, out-of-bounds/clamped targets, whitespace-target mappings, low coverage, and missing `sourcesContent`
 - **Coverage stats** — mapped vs unmapped bytes, total mappings, bad mapping counts, and per-file sizes
-- **Source map diffing** — compare two shared source maps to see which mappings stayed the same, changed, were added, or were removed
+- **Source map diffing** — compare two source maps from shared links, public URLs, pasted content, or local files to see which mappings stayed the same, changed, were added, or were removed
 - **Shareable short URLs** — source map data stored in KV with 8-char short IDs, auto-renewed 30-day TTL on every access
 - **Recent history and built-in examples** — reopen the last 5 visualizations from local storage or load bundled examples for esbuild/Oxc comparisons
 - **LLM-friendly** — AI tools get a structured markdown debug report when fetching a shared URL (content negotiation via User-Agent / `Accept` headers)
@@ -53,7 +53,7 @@ The report includes original/generated code with line numbers, a mapping table w
 
 ## Compare and Share
 
-Use **Share** in the viewer to create a short URL, then open **Compare** to diff two saved visualizations. Compare links use `/compare?a=<id>&b=<id>` and show a summary of mappings that are unchanged, changed, removed, or added, with expandable code context for each difference.
+Use **Compare** to diff two source maps from shared viewer links, public asset URLs, pasted content, or local uploads. If both sides came from shareable links, compare state is preserved in `/compare?a=<id>&b=<id>`; otherwise the compare session stays local to the current tab. The comparison view shows a summary of mappings that are unchanged, changed, removed, or added, with expandable code context for each difference.
 
 Deep-link query params also work on viewer URLs:
 
