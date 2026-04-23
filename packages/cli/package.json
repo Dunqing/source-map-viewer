@@ -21,10 +21,10 @@
     "release": "bumpp && vp run --filter source-map-viewer build && vp pm publish --no-git-checks"
   },
   "dependencies": {
-    "open": "^10.0.0",
+    "open": "^11.0.0",
     "source-map-js": "^1.2.1"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@types/node": "^25.6.0"
   }
 }
