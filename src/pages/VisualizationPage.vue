@@ -4,8 +4,10 @@ import { useSourceMapStore } from "../stores/sourceMap";
 import { useHighlighter } from "../composables/useHighlighter";
 import { formatMultiEntryHistoryLabel } from "../composables/historyLabels";
 import { useTheme } from "../composables/useTheme";
-import { compressToHash } from "../composables/useShareableUrl";
 import { useHistory } from "../composables/useHistory";
+import { navigateToPath, replaceCurrentPath } from "../composables/navigation";
+import { copyShareUrl, createComparePath } from "../composables/shareLinks";
+import { buildViewerUrl, readViewerUrlState } from "../composables/viewerUrlState";
 import CodePanel from "../components/CodePanel.vue";
 import Toolbar from "../components/Toolbar.vue";
 import StatusBar from "../components/StatusBar.vue";
@@ -19,7 +21,7 @@ import AiDebugPanel from "../components/AiDebugPanel.vue";
 import type { MappingSegment } from "../core/types";
 
 const store = useSourceMapStore();
-const { init, loading: highlighterLoading } = useHighlighter();
+const { init } = useHighlighter();
 const { addEntry: addHistoryEntry } = useHistory();
 useTheme();
 
@@ -33,27 +35,26 @@ let urlSyncEnabled = false;
 let urlSyncTimer = 0;
 
 onMounted(() => {
-  // Restore UI state from URL params (client-only)
-  const params = new URLSearchParams(window.location.search);
-  showStats.value = params.get("stats") === "1";
-  const initialEntry = Number(params.get("entry"));
-  if (initialEntry > 0) store.setActiveGeneratedEntry(initialEntry);
-  const initialTab = Number(params.get("tab"));
-  if (initialTab > 0) store.setActiveSource(initialTab);
-
-  const segParam = params.get("seg");
-  // seg implies mappings panel open
-  if (segParam != null) showMappings.value = true;
+  const initialState = readViewerUrlState(window.location.search);
+  showStats.value = initialState.showStats;
+  showMappings.value = initialState.showMappings;
+  if (initialState.activeGeneratedEntryIndex > 0) {
+    store.setActiveGeneratedEntry(initialState.activeGeneratedEntryIndex);
+  }
+  if (initialState.activeSourceIndex > 0) {
+    store.setActiveSource(initialState.activeSourceIndex);
+  }
 
   // Show content after mount cascade settles
   requestAnimationFrame(() => {
     ready.value = true;
 
     // Restore segment selection after panels are mounted (double rAF)
-    if (segParam != null && Number(segParam) >= 0 && Number(segParam) < store.mappingIndex.length) {
-      const initialSeg = Number(segParam);
+    const initialSeg = initialState.selectedSegmentIndex;
+    if (initialSeg != null && initialSeg < store.mappingIndex.length) {
       requestAnimationFrame(() => {
         const segToSelect = store.mappingIndex[initialSeg];
+        if (!segToSelect) return;
         store.setHoveredSegment(segToSelect);
         selectedSegIndex.value = initialSeg;
         store.setActiveSource(segToSelect.sourceIndex);
@@ -74,15 +75,14 @@ function syncUrlParams() {
   if (!urlSyncEnabled) return;
   clearTimeout(urlSyncTimer);
   urlSyncTimer = window.setTimeout(() => {
-    const p = new URLSearchParams();
-    if (store.activeGeneratedEntryIndex > 0)
-      p.set("entry", String(store.activeGeneratedEntryIndex));
-    if (store.activeSourceIndex > 0) p.set("tab", String(store.activeSourceIndex));
-    if (showStats.value) p.set("stats", "1");
-    if (selectedSegIndex.value != null) p.set("seg", String(selectedSegIndex.value));
-    const search = p.toString();
-    const newUrl = `${window.location.pathname}${search ? "?" + search : ""}`;
-    window.history.replaceState(null, "", newUrl);
+    replaceCurrentPath(
+      buildViewerUrl(window.location.pathname, {
+        activeGeneratedEntryIndex: store.activeGeneratedEntryIndex,
+        activeSourceIndex: store.activeSourceIndex,
+        selectedSegmentIndex: selectedSegIndex.value,
+        showStats: showStats.value,
+      }),
+    );
   }, 16);
 }
 
@@ -171,12 +171,12 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener("keydown", handleKeydown);
+  clearTimeout(urlSyncTimer);
 });
 
 function handleBack() {
   store.reset();
-  window.history.pushState(null, "", "/");
-  window.dispatchEvent(new CustomEvent("smv-navigate"));
+  navigateToPath("/");
 }
 
 function selectSegment(segment: MappingSegment) {
@@ -229,17 +229,10 @@ function handleMappingClick(segment: MappingSegment) {
 
 async function handleCompare() {
   try {
-    const res = await fetch("/api/share", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        generatedCode: store.generatedCode,
-        sourceMapJson: store.sourceMapJson,
-      }),
+    window.location.href = await createComparePath({
+      generatedCode: store.generatedCode,
+      sourceMapJson: store.sourceMapJson,
     });
-    if (!res.ok) throw new Error("Share failed");
-    const { id } = await res.json();
-    window.location.href = `/compare?a=${id}`;
   } catch {
     showToast("Failed to start compare");
   }
@@ -247,33 +240,13 @@ async function handleCompare() {
 
 async function handleShare() {
   try {
-    // Try short URL via API
-    const res = await fetch("/api/share", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        generatedCode: store.generatedCode,
-        sourceMapJson: store.sourceMapJson,
-      }),
+    const shareKind = await copyShareUrl({
+      generatedCode: store.generatedCode,
+      sourceMapJson: store.sourceMapJson,
     });
-    if (!res.ok) throw new Error("Share failed");
-    const { url } = await res.json();
-    await navigator.clipboard.writeText(url);
-    window.history.replaceState(null, "", new URL(url).pathname);
-    showToast("Short URL copied to clipboard");
+    showToast(shareKind === "short" ? "Short URL copied to clipboard" : "URL copied to clipboard");
   } catch {
-    try {
-      // Fall back to an inline compressed slug when the share API is unavailable.
-      const slug = await compressToHash({
-        generatedCode: store.generatedCode,
-        sourceMapJson: store.sourceMapJson,
-      });
-      const url = `${window.location.origin}/${slug}`;
-      await navigator.clipboard.writeText(url);
-      showToast("URL copied to clipboard");
-    } catch {
-      showToast("Failed to copy URL");
-    }
+    showToast("Failed to copy URL");
   }
 }
 </script>

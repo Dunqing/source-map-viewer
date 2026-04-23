@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import IconArrowLeft from "~icons/carbon/arrow-left";
+import { buildComparePath, extractShareSlug } from "../composables/navigation";
 
 interface CompareEntry {
   generatedCode: string;
@@ -13,30 +14,14 @@ const props = defineProps<{
   slugA?: string;
 }>();
 
-const emit = defineEmits<{
-  compare: [entryA: CompareEntry, entryB: CompareEntry];
-}>();
-
 const urlA = ref("");
 const urlB = ref("");
 const error = ref<string | null>(null);
-const loading = ref(false);
-
-function extractSlug(input: string): string {
-  const trimmed = input.trim();
-  // Full URL: extract last path segment
-  try {
-    const url = new URL(trimmed);
-    return url.pathname.slice(1); // remove leading /
-  } catch {}
-  // Bare slug
-  return trimmed;
-}
 
 async function handleCompare() {
   error.value = null;
-  const slugA = props.prefilledA ? "" : extractSlug(urlA.value);
-  const slugB = extractSlug(urlB.value);
+  const slugA = props.prefilledA ? "" : extractShareSlug(urlA.value);
+  const slugB = extractShareSlug(urlB.value);
 
   if (!props.prefilledA && !slugA) {
     error.value = "Please enter URL A";
@@ -50,11 +35,11 @@ async function handleCompare() {
   if (props.prefilledA) {
     // Preserve the existing ?a slug from the URL
     const currentSlugA = props.slugA ?? "";
-    window.location.href = `/compare?a=${currentSlugA}&b=${slugB}`;
+    window.location.href = buildComparePath(currentSlugA, slugB);
     return;
   }
 
-  window.location.href = `/compare?a=${slugA}&b=${slugB}`;
+  window.location.href = buildComparePath(slugA, slugB);
 }
 </script>
 
@@ -130,7 +115,7 @@ async function handleCompare() {
 
       <button
         class="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-        :disabled="loading || (!prefilledA && !urlA.trim()) || !urlB.trim()"
+        :disabled="(!prefilledA && !urlA.trim()) || !urlB.trim()"
         @click="handleCompare"
       >
         Compare

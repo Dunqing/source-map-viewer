@@ -12,15 +12,16 @@ import type { ResolvedFileCollection } from "../core/inputResolver";
 import { useSourceMapStore } from "../stores/sourceMap";
 import { useFileLoader } from "../composables/useFileLoader";
 import { formatMultiEntryHistoryLabel } from "../composables/historyLabels";
-import { compressToHash } from "../composables/useShareableUrl";
 import { useTheme } from "../composables/useTheme";
 import { useHistory } from "../composables/useHistory";
+import { navigateToPath } from "../composables/navigation";
+import { createSharePath } from "../composables/shareLinks";
 import {
   cacheSessionCollection,
   getCachedSessionCollection,
 } from "../composables/useSessionCollectionCache";
 import { exampleSources, type ExampleSource } from "../examples";
-import { APP_NAME } from "../constants";
+import { APP_DESCRIPTION, APP_NAME } from "../constants";
 import FileDropZone from "../components/FileDropZone.vue";
 import ExamplePreview from "../components/ExamplePreview.vue";
 
@@ -89,29 +90,13 @@ function getHistoryLabel(
   );
 }
 
-async function createSharePath(generatedCode: string, sourceMapJson: string): Promise<string> {
-  try {
-    const res = await fetch("/api/share", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ generatedCode, sourceMapJson }),
-    });
-    if (!res.ok) throw new Error();
-    const { id } = await res.json();
-    return `/${id}`;
-  } catch {
-    const slug = await compressToHash({ generatedCode, sourceMapJson });
-    return `/${slug}`;
-  }
-}
-
 async function navigateWithData(
   data: { generatedCode: string; sourceMapJson: string },
   label: string,
   sessionEntries?: ResolvedFileCollection[],
   sessionLabel?: string,
 ) {
-  const path = await createSharePath(data.generatedCode, data.sourceMapJson);
+  const path = await createSharePath(data);
   if (sessionEntries && sessionEntries.length > 1) {
     const slug = path.slice(1);
     cacheSessionCollection(slug, sessionEntries);
@@ -127,8 +112,7 @@ async function navigateWithData(
     timestamp: Date.now(),
     sessionLabel,
   });
-  window.history.pushState(null, "", path);
-  window.dispatchEvent(new CustomEvent("smv-navigate"));
+  navigateToPath(path);
 }
 
 async function handleFiles(files: File[]) {
@@ -231,8 +215,7 @@ function loadFromHistory(entry: { slug: string; sessionLabel?: string }) {
       entry.sessionLabel,
     );
   }
-  window.history.pushState(null, "", `${url.pathname}${url.search}`);
-  window.dispatchEvent(new CustomEvent("smv-navigate"));
+  navigateToPath(`${url.pathname}${url.search}`);
 }
 
 function openUploadDialog(mode: "files" | "folder") {
@@ -304,7 +287,7 @@ function formatTimeAgo(timestamp: number): string {
             </h1>
           </div>
           <p class="text-base font-mono text-fg-muted">
-            A visual tool for inspecting, comparing, and sharing JavaScript/CSS source maps.
+            {{ APP_DESCRIPTION }}
           </p>
         </div>
 

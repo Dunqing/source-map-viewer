@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onUnmounted } from "vue";
 import { useSourceMapStore } from "../src/stores/sourceMap";
+import { getPathSlug, NAVIGATION_EVENT } from "../src/composables/navigation";
 import { resolveSlug } from "../src/composables/useShareableUrl";
 import LandingPage from "../src/pages/LandingPage.vue";
 import VisualizationPage from "../src/pages/VisualizationPage.vue";
@@ -10,13 +11,8 @@ const resolved = ref(false);
 const showVisualization = ref(false);
 let currentSlug = "";
 
-function getSlugFromUrl(): string {
-  const pathMatch = window.location.pathname.match(/^\/(.+)$/);
-  return pathMatch ? pathMatch[1] : "";
-}
-
 async function handleNavigation() {
-  const slug = getSlugFromUrl();
+  const slug = getPathSlug();
   if (slug) {
     if ((slug === currentSlug || slug === store.sessionSlug) && store.parsedData) {
       // Same slug already loaded — skip redundant fetch
@@ -45,12 +41,12 @@ async function handleNavigation() {
 onMounted(() => {
   handleNavigation();
   window.addEventListener("popstate", handleNavigation);
-  window.addEventListener("smv-navigate", handleNavigation);
+  window.addEventListener(NAVIGATION_EVENT, handleNavigation);
 });
 
 onUnmounted(() => {
   window.removeEventListener("popstate", handleNavigation);
-  window.removeEventListener("smv-navigate", handleNavigation);
+  window.removeEventListener(NAVIGATION_EVENT, handleNavigation);
 });
 </script>
 

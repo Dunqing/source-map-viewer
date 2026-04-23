@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { resolveSlug } from "../src/composables/useShareableUrl";
+import { resolveSlug, type ShareableData } from "../src/composables/useShareableUrl";
 import { useTheme } from "../src/composables/useTheme";
 import CompareView from "../src/pages/CompareView.vue";
 import CompareLanding from "../src/pages/CompareLanding.vue";
 
 useTheme();
 
-interface CompareEntry {
-  generatedCode: string;
-  sourceMapJson: string;
+interface CompareEntry extends ShareableData {
   label: string;
 }
 
@@ -21,6 +19,18 @@ const slugB = ref<string | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const resolved = ref(false);
+
+function formatCompareLabel(prefix: "A" | "B", slug: string): string {
+  return `${prefix} (${slug.slice(0, 8)}...)`;
+}
+
+async function resolveCompareEntry(prefix: "A" | "B", slug: string): Promise<CompareEntry> {
+  const data = await resolveSlug(slug);
+  if (!data) {
+    throw new Error(`Failed to load source map ${prefix} (${slug})`);
+  }
+  return { ...data, label: formatCompareLabel(prefix, slug) };
+}
 
 onMounted(async () => {
   document.documentElement.classList.remove("has-share-slug");
@@ -39,29 +49,12 @@ onMounted(async () => {
 
   try {
     if (slugA.value && slugB.value) {
-      const [dataA, dataB] = await Promise.all([
-        resolveSlug(slugA.value),
-        resolveSlug(slugB.value),
+      [entryA.value, entryB.value] = await Promise.all([
+        resolveCompareEntry("A", slugA.value),
+        resolveCompareEntry("B", slugB.value),
       ]);
-
-      if (!dataA) {
-        error.value = `Failed to load source map A (${slugA.value})`;
-        return;
-      }
-      if (!dataB) {
-        error.value = `Failed to load source map B (${slugB.value})`;
-        return;
-      }
-
-      entryA.value = { ...dataA, label: `A (${slugA.value.slice(0, 8)}...)` };
-      entryB.value = { ...dataB, label: `B (${slugB.value.slice(0, 8)}...)` };
     } else if (slugA.value) {
-      const dataA = await resolveSlug(slugA.value);
-      if (!dataA) {
-        error.value = `Failed to load source map A (${slugA.value})`;
-        return;
-      }
-      prefilledA.value = { ...dataA, label: `A (${slugA.value!.slice(0, 8)}...)` };
+      prefilledA.value = await resolveCompareEntry("A", slugA.value);
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load source maps";
@@ -70,11 +63,6 @@ onMounted(async () => {
     resolved.value = true;
   }
 });
-
-function handleCompare(a: CompareEntry, b: CompareEntry) {
-  entryA.value = a;
-  entryB.value = b;
-}
 </script>
 
 <template>
@@ -110,10 +98,5 @@ function handleCompare(a: CompareEntry, b: CompareEntry) {
   />
 
   <!-- Landing: file upload -->
-  <CompareLanding
-    v-else-if="resolved"
-    :prefilled-a="prefilledA"
-    :slug-a="slugA ?? undefined"
-    @compare="handleCompare"
-  />
+  <CompareLanding v-else-if="resolved" :prefilled-a="prefilledA" :slug-a="slugA ?? undefined" />
 </template>

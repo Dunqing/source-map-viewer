@@ -38,6 +38,13 @@ const MappingConnectorStub = defineComponent({
   template: "<div />",
 });
 
+const MappingsPanelStub = defineComponent({
+  methods: {
+    scrollToHovered() {},
+  },
+  template: "<div />",
+});
+
 describe("VisualizationPage history", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -120,7 +127,7 @@ describe("VisualizationPage history", () => {
           StatusBar: EmptyStub,
           SourceTabs: EmptyStub,
           StatsPanel: EmptyStub,
-          MappingsPanel: EmptyStub,
+          MappingsPanel: MappingsPanelStub,
           SearchBar: EmptyStub,
           MappingConnector: MappingConnectorStub,
           AiDebugPanel: EmptyStub,
@@ -144,6 +151,74 @@ describe("VisualizationPage history", () => {
       label: "demo · js/beta.js (2 entries)",
       slug: "folder-multi-test?entry=1",
       sessionLabel: "demo",
+    });
+  });
+
+  it("restores seg after switching to the requested entry", async () => {
+    window.history.replaceState(null, "", "/demo?entry=1&seg=0");
+
+    const store = useSourceMapStore();
+    store.loadSourceMapCollection(
+      [
+        {
+          generatedCode: "console.log('alpha');",
+          sourceMapJson: JSON.stringify({
+            version: 3,
+            file: "js/alpha.js",
+            sources: ["src/alpha.ts"],
+            sourcesContent: ["export const alpha = true;"],
+            names: [],
+            mappings: "",
+          }),
+          label: "alpha.js",
+          entryPath: "js/alpha.js",
+          generatedPath: "js/alpha.js",
+          sourceMapPath: "maps/alpha.js.map",
+        },
+        {
+          generatedCode: "console.log('beta');",
+          sourceMapJson: JSON.stringify({
+            version: 3,
+            file: "js/beta.js",
+            sources: ["src/beta.ts"],
+            sourcesContent: ["export const beta = true;"],
+            names: [],
+            mappings: "AAAA",
+          }),
+          label: "beta.js",
+          entryPath: "js/beta.js",
+          generatedPath: "js/beta.js",
+          sourceMapPath: "maps/beta.js.map",
+        },
+      ],
+      0,
+      "folder-multi-test",
+      "demo",
+    );
+
+    mount(VisualizationPage, {
+      global: {
+        stubs: {
+          Toolbar: EmptyStub,
+          StatusBar: EmptyStub,
+          SourceTabs: EmptyStub,
+          StatsPanel: EmptyStub,
+          MappingsPanel: MappingsPanelStub,
+          SearchBar: EmptyStub,
+          MappingConnector: MappingConnectorStub,
+          AiDebugPanel: EmptyStub,
+          CodePanel: CodePanelStub,
+        },
+      },
+    });
+
+    await flushPromises();
+
+    expect(store.activeGeneratedEntryIndex).toBe(1);
+    expect(store.hoveredSegment).not.toBeNull();
+    expect(store.hoveredSegment).toMatchObject({
+      generatedLine: 0,
+      sourceIndex: 0,
     });
   });
 });
