@@ -254,6 +254,44 @@ describe("LandingPage folder upload", () => {
     });
   });
 
+  it("loads the preferred default transformer when clicking an example card", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: "example-default-test" }),
+    } satisfies Partial<Response>);
+    const pushStateSpy = vi.spyOn(window.history, "pushState");
+    const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
+
+    const wrapper = mount(LandingPage, {
+      global: {
+        stubs: {
+          FileDropZone: true,
+          ExamplePreview: true,
+        },
+      },
+    });
+
+    const exampleCard = wrapper.get('[data-example-name="Multi-Entry Bundle"]');
+    expect(exampleCard.attributes("data-default-transformer")).toBe("rolldown");
+
+    await exampleCard.trigger("click");
+    await flushPromises();
+
+    const store = useSourceMapStore();
+    expect(store.generatedCode).toContain("alphaMessage");
+    expect(store.generatedEntryCount).toBe(2);
+    expect(store.generatedEntries.map((entry) => entry.entryPath)).toEqual(["alpha.js", "beta.js"]);
+    expect(store.sessionSlug).toBe("example-default-test");
+    expect(store.sessionLabel).toBe("Multi-Entry Bundle · rolldown");
+    expect(pushStateSpy).toHaveBeenCalledWith(null, "", "/example-default-test");
+    expect(dispatchEventSpy).toHaveBeenCalledWith(expect.any(CustomEvent));
+    expect(JSON.parse(localStorage.getItem("smv-history") ?? "[]")[0]).toMatchObject({
+      label: "Multi-Entry Bundle · rolldown · alpha.js (2 entries)",
+      slug: "example-default-test",
+      sessionLabel: "Multi-Entry Bundle · rolldown",
+    });
+  });
+
   it("restores a cached folder session from recent history", async () => {
     sessionStorage.setItem(
       "smv-session-collection:folder-multi-test",
