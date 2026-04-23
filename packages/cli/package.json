@@ -1,6 +1,6 @@
 {
   "name": "source-map-viewer",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Inspect and debug source map mappings from the terminal",
   "license": "MIT",
   "repository": {
