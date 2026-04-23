@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import CodePanel from "../components/CodePanel.vue";
-import { useHighlighter } from "../composables/useHighlighter";
+import { getSharedHighlighter } from "../composables/useHighlighter";
 import { useSourceMapStore } from "../stores/sourceMap";
 
 class ResizeObserverMock {
@@ -27,7 +27,7 @@ describe("CodePanel", () => {
   });
 
   it("renders explicit whitespace classes while preserving the underlying whitespace nodes", async () => {
-    await useHighlighter().init();
+    await getSharedHighlighter({ langs: ["javascript"], themes: ["github-light"] });
     const wrapper = mount(CodePanel, {
       props: {
         code: "a  \tb",

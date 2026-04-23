@@ -1,39 +1,92 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, watch } from "vue";
 import MarkdownIt from "markdown-it";
+import { transformerMetaHighlight } from "@shikijs/transformers";
 import IconCopy from "~icons/carbon/copy";
 import IconCheckmark from "~icons/carbon/checkmark";
 import IconClose from "~icons/carbon/close";
 import IconLightbulb from "~icons/carbon/idea";
 import { useAiDebugPrompt } from "../composables/useAiDebugPrompt";
+import { getSharedHighlighter, supportedShikiThemes } from "../composables/useHighlighter";
+import { isSupportedShikiLanguage, type SupportedShikiLanguage } from "../core/language";
 
 const { prompt } = useAiDebugPrompt();
 const copied = ref(false);
 const renderedHtml = ref("");
+let markdownRendererPromise: Promise<MarkdownIt> | null = null;
+let renderRequestId = 0;
 
-const md = new MarkdownIt({ html: false });
+const markdownHighlighterLanguages = [
+  "jsx",
+  "tsx",
+] as const satisfies readonly SupportedShikiLanguage[];
 
-onMounted(async () => {
-  const { fromHighlighter } = await import("@shikijs/markdown-it");
-  const { createHighlighterCore } = await import("shiki/core");
-  const { createJavaScriptRegexEngine } = await import("shiki/engine/javascript");
-  const [githubLight, githubDark, javascript, typescript, tsx, jsx, css] = await Promise.all([
-    import("shiki/themes/github-light.mjs").then((m) => m.default),
-    import("shiki/themes/github-dark.mjs").then((m) => m.default),
-    import("shiki/langs/javascript.mjs").then((m) => m.default),
-    import("shiki/langs/typescript.mjs").then((m) => m.default),
-    import("shiki/langs/tsx.mjs").then((m) => m.default),
-    import("shiki/langs/jsx.mjs").then((m) => m.default),
-    import("shiki/langs/css.mjs").then((m) => m.default),
-  ]);
-  const highlighter = await createHighlighterCore({
-    themes: [githubLight, githubDark],
-    langs: [javascript, typescript, tsx, jsx, css],
-    engine: createJavaScriptRegexEngine(),
-  });
-  md.use(fromHighlighter(highlighter, { themes: { light: "github-light", dark: "github-dark" } }));
-  renderedHtml.value = md.render(prompt.value);
-});
+function extractMarkdownFenceLanguages(markdownSource: string): SupportedShikiLanguage[] {
+  const found = new Set<SupportedShikiLanguage>(markdownHighlighterLanguages);
+
+  for (const match of markdownSource.matchAll(/^```([^\s{]+)/gm)) {
+    const language = match[1]?.toLowerCase();
+    if (language && isSupportedShikiLanguage(language)) {
+      found.add(language);
+    }
+  }
+
+  return [...found];
+}
+
+async function getMarkdownRenderer(): Promise<MarkdownIt> {
+  if (!markdownRendererPromise) {
+    markdownRendererPromise = (async () => {
+      const { fromHighlighter } = await import("@shikijs/markdown-it/core");
+      const highlighter = await getSharedHighlighter();
+      const markdown = new MarkdownIt({ html: false });
+
+      markdown.use(
+        fromHighlighter(highlighter, {
+          themes: { light: "github-light", dark: "github-dark" },
+          defaultLanguage: "text",
+          fallbackLanguage: "text",
+          transformers: [transformerMetaHighlight()],
+        }),
+      );
+
+      return markdown;
+    })().catch((error) => {
+      markdownRendererPromise = null;
+      throw error;
+    });
+  }
+
+  return markdownRendererPromise;
+}
+
+async function renderPrompt(markdownSource: string) {
+  const requestId = ++renderRequestId;
+  try {
+    await getSharedHighlighter({
+      langs: extractMarkdownFenceLanguages(markdownSource),
+      themes: supportedShikiThemes,
+    });
+    const markdown = await getMarkdownRenderer();
+    const html = markdown.render(markdownSource);
+    if (requestId === renderRequestId) {
+      renderedHtml.value = html;
+    }
+  } catch {
+    if (requestId === renderRequestId) {
+      renderedHtml.value = "";
+    }
+  }
+}
+
+watch(
+  prompt,
+  (value) => {
+    if (typeof window === "undefined") return;
+    void renderPrompt(value);
+  },
+  { immediate: true },
+);
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -101,6 +154,10 @@ function copyPrompt() {
 .prose .shiki code {
   background: transparent !important;
 }
+.prose .shiki .line.highlighted {
+  background-color: rgba(245, 158, 11, 0.12);
+  box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.9);
+}
 .prose :not(pre) > code {
   background-color: var(--c-bg-mute);
   padding: 0.15em 0.35em;
@@ -112,6 +169,10 @@ html.dark .prose .shiki span {
 }
 html.dark .prose .shiki {
   background-color: var(--c-bg-mute) !important;
+}
+html.dark .prose .shiki .line.highlighted {
+  background-color: rgba(250, 204, 21, 0.12);
+  box-shadow: inset 3px 0 0 rgba(250, 204, 21, 0.85);
 }
 .prose table {
   width: max-content;

@@ -139,6 +139,11 @@ interface LineWindow {
   end: number;
 }
 
+interface FormattedExcerpt {
+  code: string;
+  highlightMeta: string;
+}
+
 function classifyRegionKind(lineText: string): string {
   const trimmed = lineText.trim();
   if (trimmed.startsWith("return function")) return "generated wrapper function";
@@ -387,26 +392,62 @@ function buildLineWindows(targetLines: number[], totalLines: number, padding = 2
   return merged.slice(0, 4);
 }
 
-function formatCodeExcerpt(lines: string[], targetLines: number[], padding = 2): string {
-  if (lines.length === 0) return "(empty)";
+function formatHighlightedLineRanges(lines: number[]): string {
+  if (lines.length === 0) return "";
+
+  const sorted = [...new Set(lines)].sort((a, b) => a - b);
+  const ranges: string[] = [];
+  let start = sorted[0];
+  let end = sorted[0];
+
+  for (let index = 1; index < sorted.length; index++) {
+    const line = sorted[index];
+    if (line === end + 1) {
+      end = line;
+      continue;
+    }
+    ranges.push(start === end ? `${start}` : `${start}-${end}`);
+    start = line;
+    end = line;
+  }
+
+  ranges.push(start === end ? `${start}` : `${start}-${end}`);
+  return `{${ranges.join(",")}}`;
+}
+
+function formatCodeExcerpt(lines: string[], targetLines: number[], padding = 2): FormattedExcerpt {
+  if (lines.length === 0) {
+    return { code: "(empty)", highlightMeta: "" };
+  }
 
   const windows = buildLineWindows(targetLines, lines.length, padding);
   const output: string[] = [];
+  const highlightedOutputLines: number[] = [];
+  const targetSet = new Set(targetLines);
   let previousEnd = -1;
+  let outputLineNumber = 0;
 
   for (const window of windows) {
     if (previousEnd >= 0 && window.start > previousEnd + 1) {
       output.push("  ... | ...");
+      outputLineNumber++;
     }
 
     for (let line = window.start; line <= window.end; line++) {
       output.push(`${String(line + 1).padStart(3)} | ${lines[line] ?? ""}`);
+      outputLineNumber++;
+      if (targetSet.has(line)) {
+        highlightedOutputLines.push(outputLineNumber);
+      }
     }
 
     previousEnd = window.end;
   }
 
-  return output.join("\n");
+  return {
+    code: output.join("\n"),
+    highlightMeta: formatHighlightedLineRanges(highlightedOutputLines),
+  };
 }
 
 function visualizeWhitespace(text: string): string {
@@ -771,8 +812,8 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
       return [
         `### ${escapeMarkdown(sourceName)}`,
         "",
-        `\`\`\`${detectLanguage(sourceName)}`,
-        excerpt,
+        `\`\`\`${detectLanguage(sourceName)}${excerpt.highlightMeta ? ` ${excerpt.highlightMeta}` : ""}`,
+        excerpt.code,
         "```",
         "",
       ];
@@ -831,8 +872,8 @@ export function generateDebugPrompt(input: DebugPromptInput): string {
     ...originalCodeSections,
     "## Generated code excerpt",
     "",
-    `\`\`\`${detectLanguage(parsedData.file ?? "output.js")}`,
-    generatedExcerpt,
+    `\`\`\`${detectLanguage(parsedData.file ?? "output.js")}${generatedExcerpt.highlightMeta ? ` ${generatedExcerpt.highlightMeta}` : ""}`,
+    generatedExcerpt.code,
     "```",
     "",
     `## Mapping table (${mappingNote})`,

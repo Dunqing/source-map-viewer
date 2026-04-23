@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, nextTick, onMounted, onUnmounted } from "vue";
+import { computed, ref, nextTick, onMounted, onUnmounted, watch } from "vue";
 import { useVirtualScroll } from "../composables/useVirtualScroll";
 import { useHighlighter } from "../composables/useHighlighter";
 import { useSourceMapStore } from "../stores/sourceMap";
@@ -14,7 +14,11 @@ import { useTheme } from "../composables/useTheme";
 import IconCopy from "~icons/carbon/copy";
 import IconCheckmark from "~icons/carbon/checkmark";
 import type { MappingSegment } from "../core/types";
-import type { HighlightedToken, WhitespaceKind } from "../composables/useHighlighter";
+import type {
+  HighlightedToken,
+  SupportedShikiTheme,
+  WhitespaceKind,
+} from "../composables/useHighlighter";
 
 const copied = ref(false);
 
@@ -40,7 +44,7 @@ const emit = defineEmits<{
 
 const store = useSourceMapStore();
 const { resolvedTheme } = useTheme();
-const { tokenizeLines, detectLanguage, loading: highlighterLoading } = useHighlighter();
+const { tokenizeLines, detectLanguage, init, loading: highlighterLoading } = useHighlighter();
 
 const containerRef = ref<HTMLElement | null>(null);
 const containerHeight = ref(400);
@@ -69,11 +73,24 @@ function onVirtualScroll(e: Event) {
   positionCache.clear();
 }
 
+const detectedLanguage = computed(() => detectLanguage(props.filename));
+const activeThemeName = computed<SupportedShikiTheme>(() =>
+  resolvedTheme.value === "dark" ? "github-dark" : "github-light",
+);
+
+watch(
+  [detectedLanguage, activeThemeName],
+  ([lang, theme]) => {
+    void init({ langs: [lang], themes: [theme] });
+  },
+  { immediate: true },
+);
+
 const allTokens = computed<HighlightedToken[][]>(() => {
   if (!props.code) return [];
+  void highlighterLoading.value; // re-tokenize after async language loads finish
   void resolvedTheme.value; // explicit dependency — re-tokenize on theme change
-  const lang = detectLanguage(props.filename);
-  return tokenizeLines(props.code, lang);
+  return tokenizeLines(props.code, detectedLanguage.value);
 });
 
 /**

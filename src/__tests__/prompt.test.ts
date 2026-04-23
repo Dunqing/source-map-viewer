@@ -158,6 +158,7 @@ describe("generateDebugPrompt", () => {
     expect(prompt).toContain("Generated inferred range to next boundary:");
     expect(prompt).toContain("## Original code excerpts");
     expect(prompt).toContain("## Generated code excerpt");
+    expect(prompt.match(/```javascript \{1\}/g)).toHaveLength(2);
   });
 
   it("picks the strongest split-token suspect without relying on selection state", () => {

@@ -7,7 +7,7 @@ const jsonLd = JSON.stringify({
   "@type": "WebApplication",
   name: "Source Map Viewer",
   description:
-    "Interactive tool to visualize and debug JavaScript/CSS source map mappings. Upload, paste, or fetch source maps to see how generated code positions map back to original source.",
+    "Interactive tool to visualize and debug source map mappings across JavaScript, TypeScript, CSS, Vue, Svelte, Astro, and related generated code. Upload, paste, or fetch source maps to see how generated code positions map back to original source.",
   url: "https://source-map-viewer.void.app",
   applicationCategory: "DeveloperApplication",
   operatingSystem: "Any",
@@ -32,9 +32,9 @@ const jsonLd = JSON.stringify({
     >
       <h1>Source Map Viewer</h1>
       <p>
-        This is an interactive tool for visualizing and debugging JavaScript/CSS source map
-        mappings. It shows how generated code positions map back to original source with color-coded
-        segment highlighting and connector lines.
+        This is an interactive tool for visualizing and debugging source map mappings. It shows how
+        generated code positions map back to original source with color-coded segment highlighting
+        and connector lines.
       </p>
       <h2>Features</h2>
       <ul>
@@ -45,7 +45,10 @@ const jsonLd = JSON.stringify({
           unmapped regions
         </li>
         <li>Coverage statistics showing mapped vs unmapped bytes per file</li>
-        <li>Three input modes: file upload (.js/.ts/.css/.map/.json), paste, or URL fetch</li>
+        <li>
+          Three input modes: file upload (.js/.ts/.vue/.svelte/.astro/.css/.map/.json), paste, or
+          URL fetch
+        </li>
         <li>Shareable URLs with short IDs or inline compressed URL slugs</li>
       </ul>
       <p>This tool requires JavaScript to run. Please enable JavaScript in your browser.</p>

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted, nextTick } from "vue";
 import { useSourceMapStore } from "../stores/sourceMap";
-import { useHighlighter } from "../composables/useHighlighter";
 import { formatMultiEntryHistoryLabel } from "../composables/historyLabels";
 import { useTheme } from "../composables/useTheme";
 import { useHistory } from "../composables/useHistory";
@@ -21,7 +20,6 @@ import AiDebugPanel from "../components/AiDebugPanel.vue";
 import type { MappingSegment } from "../core/types";
 
 const store = useSourceMapStore();
-const { init } = useHighlighter();
 const { addEntry: addHistoryEntry } = useHistory();
 useTheme();
 
@@ -164,9 +162,8 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
-onMounted(async () => {
+onMounted(() => {
   document.addEventListener("keydown", handleKeydown);
-  await init();
 });
 
 onUnmounted(() => {
