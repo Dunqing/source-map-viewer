@@ -23,6 +23,7 @@ function createSourceMapStore() {
   const activeSourceIndex = ref(0);
   const hoveredSegment = shallowRef<MappingSegment | null>(null);
   const error = ref<string | null>(null);
+  let pendingHoverSourceSync = 0;
 
   const activeSourceContent = computed(() => {
     if (!parsedData.value) return "";
@@ -104,14 +105,35 @@ function createSourceMapStore() {
     }
   }
 
+  function cancelPendingHoverSourceSync() {
+    if (!pendingHoverSourceSync || typeof window === "undefined") return;
+    window.cancelAnimationFrame(pendingHoverSourceSync);
+    pendingHoverSourceSync = 0;
+  }
+
   function setHoveredSegment(segment: MappingSegment | null) {
     hoveredSegment.value = segment;
-    if (segment && segment.sourceIndex !== activeSourceIndex.value) {
-      setActiveSource(segment.sourceIndex);
+    cancelPendingHoverSourceSync();
+
+    if (!segment || segment.sourceIndex === activeSourceIndex.value) {
+      return;
     }
+
+    if (typeof window === "undefined") {
+      setActiveSource(segment.sourceIndex);
+      return;
+    }
+
+    pendingHoverSourceSync = window.requestAnimationFrame(() => {
+      pendingHoverSourceSync = 0;
+      if (hoveredSegment.value === segment) {
+        setActiveSource(segment.sourceIndex);
+      }
+    });
   }
 
   function reset() {
+    cancelPendingHoverSourceSync();
     generatedCode.value = "";
     sourceMapJson.value = "";
     parsedData.value = null;

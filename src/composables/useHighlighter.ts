@@ -14,6 +14,8 @@ import { detectLanguage } from "../core/language";
 const highlighter = shallowRef<HighlighterCore | null>(null);
 const loading = shallowRef(true);
 const whitespaceTransformer = transformerRenderWhitespace();
+const highlightedTokenCache = new Map<string, HighlightedToken[][]>();
+const MAX_HIGHLIGHT_CACHE_SIZE = 8;
 
 export type WhitespaceKind = "space" | "tab";
 
@@ -29,6 +31,20 @@ export interface HighlightedToken {
   content: string;
   color: string | undefined;
   whitespaceKind: WhitespaceKind | null;
+}
+
+function rememberHighlightedLines(key: string, tokens: HighlightedToken[][]): HighlightedToken[][] {
+  highlightedTokenCache.delete(key);
+  highlightedTokenCache.set(key, tokens);
+
+  if (highlightedTokenCache.size > MAX_HIGHLIGHT_CACHE_SIZE) {
+    const oldestKey = highlightedTokenCache.keys().next().value;
+    if (oldestKey) {
+      highlightedTokenCache.delete(oldestKey);
+    }
+  }
+
+  return tokens;
 }
 
 function getClassList(value: unknown): string[] {
@@ -103,12 +119,23 @@ export function useHighlighter() {
   function tokenizeLines(code: string, lang: string): HighlightedToken[][] {
     if (!highlighter.value) return [];
     const themeName = resolvedTheme.value === "dark" ? "github-dark" : "github-light";
-    return parseHighlightedLines(
-      highlighter.value.codeToHast(code, {
-        lang,
-        theme: themeName,
-        transformers: [whitespaceTransformer],
-      }) as HastNode,
+    const cacheKey = `${themeName}:${lang}:${code}`;
+    const cached = highlightedTokenCache.get(cacheKey);
+    if (cached) {
+      highlightedTokenCache.delete(cacheKey);
+      highlightedTokenCache.set(cacheKey, cached);
+      return cached;
+    }
+
+    return rememberHighlightedLines(
+      cacheKey,
+      parseHighlightedLines(
+        highlighter.value.codeToHast(code, {
+          lang,
+          theme: themeName,
+          transformers: [whitespaceTransformer],
+        }) as HastNode,
+      ),
     );
   }
 

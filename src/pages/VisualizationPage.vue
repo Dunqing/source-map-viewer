@@ -99,8 +99,23 @@ watch(
   () => store.hoveredSegment,
   (seg) => {
     if (!seg) return;
-    originalPanelRef.value?.scrollToLineIfNeeded(seg.originalLine);
     generatedPanelRef.value?.scrollToLineIfNeeded(seg.generatedLine);
+    if (seg.sourceIndex === store.activeSourceIndex) {
+      originalPanelRef.value?.scrollToLineIfNeeded(seg.originalLine);
+    }
+  },
+);
+
+watch(
+  [() => store.hoveredSegment, () => store.activeSourceIndex],
+  async ([seg, activeSourceIndex], [, previousActiveSourceIndex]) => {
+    if (!seg || activeSourceIndex === previousActiveSourceIndex) return;
+    if (seg.sourceIndex !== activeSourceIndex) return;
+
+    await nextTick();
+    if (store.hoveredSegment !== seg || store.activeSourceIndex !== activeSourceIndex) return;
+
+    originalPanelRef.value?.scrollToLineIfNeeded(seg.originalLine);
   },
 );
 

@@ -22,58 +22,76 @@ const origLinesMap = computed(() => {
   return map;
 });
 
-const mappings = computed(() => {
+interface MappingRow {
+  i: number;
+  seg: import("../core/types").MappingSegment;
+  genLine: number;
+  genCol: number;
+  genSnippet: string;
+  source: string;
+  origLine: number;
+  origCol: number;
+  origSnippet: string;
+  name: string | null;
+  isBad: boolean;
+  isSuspicious: boolean;
+}
+
+const mappingRows = computed<MappingRow[]>(() => {
   if (!store.parsedData) return [];
 
-  const q = filter.value.toLowerCase();
   const snippetOptions = { length: 30, appendEllipsis: true } as const;
-  return store.mappingIndex
-    .map((seg, i) => {
-      const source = store.parsedData!.sources[seg.sourceIndex] ?? "?";
-      const name = seg.nameIndex !== null ? store.parsedData!.names[seg.nameIndex] : null;
-      const genSnippet = extractGeneratedSnippet(
-        genLines.value,
-        seg.generatedLine,
-        seg.generatedColumn,
-        snippetOptions,
-      );
-      const origLines = origLinesMap.value.get(seg.sourceIndex) ?? [];
-      const origSnippet = extractOriginalSnippet(
-        origLines,
-        seg.originalLine,
-        seg.originalColumn,
-        snippetOptions,
-      );
-      const isBad = store.badSegmentSet.has(seg);
-      const isSuspicious = store.splitTokenSegmentSet.has(seg);
-      return {
-        i,
-        seg,
-        genLine: seg.generatedLine + 1,
-        genCol: seg.generatedColumn,
-        genSnippet,
-        source,
-        origLine: seg.originalLine + 1,
-        origCol: seg.originalColumn,
-        origSnippet,
-        name,
-        isBad,
-        isSuspicious,
-        isHovered: seg === store.hoveredSegment,
-      };
-    })
-    .filter((m) => {
-      if (!q) return true;
-      return (
-        `${m.genLine}:${m.genCol}`.includes(q) ||
-        `${m.origLine}:${m.origCol}`.includes(q) ||
-        m.source.toLowerCase().includes(q) ||
-        m.genSnippet.toLowerCase().includes(q) ||
-        m.origSnippet.toLowerCase().includes(q) ||
-        (m.isSuspicious && "suspicious split-token identifier".includes(q)) ||
-        (m.name?.toLowerCase().includes(q) ?? false)
-      );
-    });
+  const data = store.parsedData;
+
+  return store.mappingIndex.map((seg, i) => {
+    const source = data.sources[seg.sourceIndex] ?? "?";
+    const name = seg.nameIndex !== null ? data.names[seg.nameIndex] : null;
+    const genSnippet = extractGeneratedSnippet(
+      genLines.value,
+      seg.generatedLine,
+      seg.generatedColumn,
+      snippetOptions,
+    );
+    const origLines = origLinesMap.value.get(seg.sourceIndex) ?? [];
+    const origSnippet = extractOriginalSnippet(
+      origLines,
+      seg.originalLine,
+      seg.originalColumn,
+      snippetOptions,
+    );
+
+    return {
+      i,
+      seg,
+      genLine: seg.generatedLine + 1,
+      genCol: seg.generatedColumn,
+      genSnippet,
+      source,
+      origLine: seg.originalLine + 1,
+      origCol: seg.originalColumn,
+      origSnippet,
+      name,
+      isBad: store.badSegmentSet.has(seg),
+      isSuspicious: store.splitTokenSegmentSet.has(seg),
+    };
+  });
+});
+
+const mappings = computed(() => {
+  const q = filter.value.toLowerCase();
+  if (!q) return mappingRows.value;
+
+  return mappingRows.value.filter((m) => {
+    return (
+      `${m.genLine}:${m.genCol}`.includes(q) ||
+      `${m.origLine}:${m.origCol}`.includes(q) ||
+      m.source.toLowerCase().includes(q) ||
+      m.genSnippet.toLowerCase().includes(q) ||
+      m.origSnippet.toLowerCase().includes(q) ||
+      (m.isSuspicious && "suspicious split-token identifier".includes(q)) ||
+      (m.name?.toLowerCase().includes(q) ?? false)
+    );
+  });
 });
 
 function scrollToHovered() {
@@ -158,12 +176,12 @@ function copyMappings() {
             :key="m.i"
             class="border-t border-edge hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer"
             :class="[
-              m.isHovered ? 'bg-yellow-50 dark:bg-yellow-900/20' : '',
-              m.isBad && !m.isHovered ? 'bg-red-50 dark:bg-red-900/10' : '',
-              m.isSuspicious && !m.isBad && !m.isHovered ? 'suspicious-row' : '',
+              store.hoveredSegment === m.seg ? 'bg-yellow-50 dark:bg-yellow-900/20' : '',
+              m.isBad && store.hoveredSegment !== m.seg ? 'bg-red-50 dark:bg-red-900/10' : '',
+              m.isSuspicious && !m.isBad && store.hoveredSegment !== m.seg ? 'suspicious-row' : '',
             ]"
             :title="m.isSuspicious ? 'Suspicious: mapping cuts through an identifier' : undefined"
-            :data-mapping-hovered="m.isHovered || undefined"
+            :data-mapping-hovered="store.hoveredSegment === m.seg || undefined"
             @mouseenter="store.setHoveredSegment(m.seg)"
             @mouseleave="store.setHoveredSegment(null)"
             @click="emit('clickMapping', m.seg)"
