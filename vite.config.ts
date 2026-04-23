@@ -119,7 +119,9 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: {},
+  fmt: {
+    ignorePatterns: [".void/**/*"],
+  },
   lint: {
     options: {
       typeAware: true,
