@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import IconArrowLeft from "~icons/carbon/arrow-left";
 import { parseSourceMap } from "../core/parser";
 import { buildMappingIndex, buildVisibleGeneratedMappingIndex } from "../core/mapper";
@@ -13,6 +13,8 @@ const props = defineProps<{
   slugA?: string;
   slugB?: string;
 }>();
+
+const ignoreSourceName = ref(false);
 
 const parsedA = computed(() => parseSourceMap(props.entryA.sourceMapJson));
 const parsedB = computed(() => parseSourceMap(props.entryB.sourceMapJson));
@@ -38,6 +40,7 @@ const diffResult = computed(() =>
     sourcesB: parsedB.value.sources,
     namesA: parsedA.value.names,
     namesB: parsedB.value.names,
+    ignoreSourceName: ignoreSourceName.value,
   }),
 );
 
@@ -131,6 +134,7 @@ function compareCountLabel(visibleCount: number, rawCount: number): string {
     <!-- Diff table -->
     <div class="max-w-6xl mx-auto p-4">
       <MappingDiffTable
+        v-model:ignore-source-name="ignoreSourceName"
         :entries="diffResult.entries"
         :summary="diffResult.summary"
         :sources-a="parsedA.sources"

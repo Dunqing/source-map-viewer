@@ -25,6 +25,7 @@ export interface DiffOptions {
   sourcesB?: string[];
   namesA?: string[];
   namesB?: string[];
+  ignoreSourceName?: boolean;
 }
 
 function sameSource(
@@ -54,12 +55,22 @@ function nameId(seg: MappingSegment, names?: string[]): string {
   return names?.[seg.nameIndex] ?? `#${seg.nameIndex}`;
 }
 
-function makeOriginalKey(seg: MappingSegment, sources?: string[]): string {
-  return `${sourceId(seg, sources)}:${seg.originalLine}:${seg.originalColumn}`;
+function makeOriginalKey(
+  seg: MappingSegment,
+  sources?: string[],
+  ignoreSourceName?: boolean,
+): string {
+  const sourcePart = ignoreSourceName ? "" : sourceId(seg, sources);
+  return `${sourcePart}:${seg.originalLine}:${seg.originalColumn}`;
 }
 
-function makeExactKey(seg: MappingSegment, sources?: string[], names?: string[]): string {
-  return `${makeGeneratedKey(seg)}|${makeOriginalKey(seg, sources)}|${nameId(seg, names)}`;
+function makeExactKey(
+  seg: MappingSegment,
+  sources?: string[],
+  names?: string[],
+  ignoreSourceName?: boolean,
+): string {
+  return `${makeGeneratedKey(seg)}|${makeOriginalKey(seg, sources, ignoreSourceName)}|${nameId(seg, names)}`;
 }
 
 function buildQueueMap(
@@ -149,10 +160,10 @@ export function diffMappings(
   b: MappingSegment[],
   options: DiffOptions = {},
 ): DiffResult {
-  const { sourcesA, sourcesB, namesA, namesB } = options;
-  const bByExact = buildQueueMap(b, (seg) => makeExactKey(seg, sourcesB, namesB));
+  const { sourcesA, sourcesB, namesA, namesB, ignoreSourceName } = options;
+  const bByExact = buildQueueMap(b, (seg) => makeExactKey(seg, sourcesB, namesB, ignoreSourceName));
   const bByGenerated = buildQueueMap(b, makeGeneratedKey);
-  const bByOriginal = buildQueueMap(b, (seg) => makeOriginalKey(seg, sourcesB));
+  const bByOriginal = buildQueueMap(b, (seg) => makeOriginalKey(seg, sourcesB, ignoreSourceName));
 
   const usedA = new Set<number>();
   const usedB = new Set<number>();
@@ -161,7 +172,11 @@ export function diffMappings(
 
   // First, match exact mappings: same generated and same original/source location.
   a.forEach((aSeg, index) => {
-    const bIndex = popNextUnmatched(bByExact, makeExactKey(aSeg, sourcesA, namesA), usedB);
+    const bIndex = popNextUnmatched(
+      bByExact,
+      makeExactKey(aSeg, sourcesA, namesA, ignoreSourceName),
+      usedB,
+    );
     if (bIndex == null) return;
 
     usedA.add(index);
@@ -187,7 +202,11 @@ export function diffMappings(
   a.forEach((aSeg, index) => {
     if (usedA.has(index)) return;
 
-    const bIndex = popNextUnmatched(bByOriginal, makeOriginalKey(aSeg, sourcesA), usedB);
+    const bIndex = popNextUnmatched(
+      bByOriginal,
+      makeOriginalKey(aSeg, sourcesA, ignoreSourceName),
+      usedB,
+    );
     if (bIndex == null) return;
 
     usedA.add(index);

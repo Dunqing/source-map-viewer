@@ -22,7 +22,17 @@ const props = defineProps<{
   origLinesB: string[][];
   rawMappingsA: MappingSegment[];
   rawMappingsB: MappingSegment[];
+  ignoreSourceName: boolean;
 }>();
+
+const emit = defineEmits<{
+  "update:ignoreSourceName": [value: boolean];
+}>();
+
+const ignoreSourceNameModel = computed({
+  get: () => props.ignoreSourceName,
+  set: (value: boolean) => emit("update:ignoreSourceName", value),
+});
 
 const showSame = ref(false);
 const expandedIndex = ref<string | null>(null);
@@ -159,14 +169,38 @@ function isGeneratedChanged(entry: DiffEntry): boolean {
   );
 }
 
-function isOriginalChanged(entry: DiffEntry): boolean {
-  return !!(
+function sourceNameDiffers(entry: DiffEntry): boolean {
+  return (
     entry.status === "changed" &&
-    entry.a &&
-    entry.b &&
-    (entry.a.originalLine !== entry.b.originalLine ||
-      entry.a.originalColumn !== entry.b.originalColumn ||
-      originalSourceName(entry, "a") !== originalSourceName(entry, "b"))
+    !!entry.a &&
+    !!entry.b &&
+    originalSourceName(entry, "a") !== originalSourceName(entry, "b")
+  );
+}
+
+function isOnlySourceNameChanged(entry: DiffEntry): boolean {
+  if (!sourceNameDiffers(entry)) return false;
+  const a = entry.a!;
+  const b = entry.b!;
+  return (
+    a.generatedLine === b.generatedLine &&
+    a.generatedColumn === b.generatedColumn &&
+    a.originalLine === b.originalLine &&
+    a.originalColumn === b.originalColumn
+  );
+}
+
+function shouldShowSourceName(entry: DiffEntry): boolean {
+  return sourceNameDiffers(entry);
+}
+
+function isOriginalChanged(entry: DiffEntry): boolean {
+  if (isOnlySourceNameChanged(entry)) return false;
+  if (entry.status !== "changed" || !entry.a || !entry.b) return false;
+  return (
+    entry.a.originalLine !== entry.b.originalLine ||
+    entry.a.originalColumn !== entry.b.originalColumn ||
+    sourceNameDiffers(entry)
   );
 }
 
@@ -530,7 +564,11 @@ function statusTextClass(status: DiffEntry["status"]): string {
       <span class="text-green-600 dark:text-green-400 font-semibold">
         {{ summary.added }} added
       </span>
-      <span class="ml-auto">
+      <span class="ml-auto flex items-center gap-3">
+        <label class="flex items-center gap-1.5 cursor-pointer text-fg-muted">
+          <input v-model="ignoreSourceNameModel" type="checkbox" class="rounded" />
+          Ignore source filename
+        </label>
         <label class="flex items-center gap-1.5 cursor-pointer text-fg-muted">
           <input v-model="showSame" type="checkbox" class="rounded" />
           Show identical
@@ -543,7 +581,10 @@ function statusTextClass(status: DiffEntry["status"]): string {
       v-if="filteredEntries.length === 0 && !showSame"
       class="text-center py-8 text-fg-muted text-sm"
     >
-      No differences found. Source maps are identical.
+      <template v-if="ignoreSourceName && summary.same > 0">
+        No differences found after ignoring source filenames.
+      </template>
+      <template v-else> No differences found. Source maps are identical. </template>
     </div>
 
     <!-- Diff cards -->
@@ -574,9 +615,24 @@ function statusTextClass(status: DiffEntry["status"]): string {
           <!-- Original -->
           <div class="flex-1 min-w-0 mt-0.5">
             <template v-if="entry.status === 'changed'">
-              <div v-if="isOriginalChanged(entry)" class="space-y-0.5">
+              <div v-if="isOnlySourceNameChanged(entry)" class="flex items-center gap-1.5 min-w-0">
+                <span class="text-fg-muted">{{ origPos(entry, "a") }}</span>
+                <code class="text-fg-dim truncate">{{ origCode(entry, "a") }}</code>
+                <span
+                  class="shrink-0 inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-sans text-amber-700 dark:text-amber-300"
+                >
+                  {{ originalSourceName(entry, "a") }} → {{ originalSourceName(entry, "b") }}
+                </span>
+              </div>
+              <div v-else-if="isOriginalChanged(entry)" class="space-y-0.5">
                 <div class="flex items-center gap-1.5">
                   <span class="text-red-500 font-semibold w-6">A:</span>
+                  <span
+                    v-if="shouldShowSourceName(entry)"
+                    class="text-fg-muted text-[10px] shrink-0"
+                  >
+                    {{ originalSourceName(entry, "a") }}
+                  </span>
                   <span class="text-fg-muted">{{ origPos(entry, "a") }}</span>
                   <code class="text-red-500 line-through truncate">{{
                     originalDiffSnippet(entry, "a")
@@ -584,6 +640,12 @@ function statusTextClass(status: DiffEntry["status"]): string {
                 </div>
                 <div class="flex items-center gap-1.5">
                   <span class="text-green-600 dark:text-green-400 font-semibold w-6">B:</span>
+                  <span
+                    v-if="shouldShowSourceName(entry)"
+                    class="text-fg-muted text-[10px] shrink-0"
+                  >
+                    {{ originalSourceName(entry, "b") }}
+                  </span>
                   <span class="text-fg-muted">{{ origPos(entry, "b") }}</span>
                   <code class="text-green-600 dark:text-green-400 truncate">{{
                     originalDiffSnippet(entry, "b")

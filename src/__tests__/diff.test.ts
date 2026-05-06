@@ -250,4 +250,76 @@ describe("diffMappings", () => {
       findNearestMappingInSameSource(target, ["a.ts"], [otherSourceCandidate], ["b.ts", "c.ts"]),
     ).toBeNull();
   });
+
+  describe("ignoreSourceName option", () => {
+    it("classifies as same when only source filename differs and ignoreSourceName is true", () => {
+      const a = [seg(0, 0, 1, 0, 0)];
+      const b = [seg(0, 0, 1, 0, 0)];
+      const result = diffMappings(a, b, {
+        sourcesA: ["before.js"],
+        sourcesB: ["after.js"],
+        ignoreSourceName: true,
+      });
+
+      expect(result.summary).toEqual({
+        same: 1,
+        changed: 0,
+        removed: 0,
+        added: 0,
+      });
+      expect(result.entries[0].status).toBe("same");
+    });
+
+    it("still classifies as changed when ignoreSourceName is false (default)", () => {
+      const a = [seg(0, 0, 1, 0, 0)];
+      const b = [seg(0, 0, 1, 0, 0)];
+      const result = diffMappings(a, b, {
+        sourcesA: ["before.js"],
+        sourcesB: ["after.js"],
+      });
+
+      expect(result.summary).toEqual({
+        same: 0,
+        changed: 1,
+        removed: 0,
+        added: 0,
+      });
+      expect(result.entries[0].status).toBe("changed");
+    });
+
+    it("still classifies as changed when filename and original position both differ, even with ignoreSourceName true", () => {
+      const a = [seg(0, 0, 1, 0, 0)];
+      const b = [seg(0, 0, 5, 10, 0)];
+      const result = diffMappings(a, b, {
+        sourcesA: ["before.js"],
+        sourcesB: ["after.js"],
+        ignoreSourceName: true,
+      });
+
+      expect(result.summary).toEqual({
+        same: 0,
+        changed: 1,
+        removed: 0,
+        added: 0,
+      });
+      expect(result.entries[0].status).toBe("changed");
+    });
+
+    it("does not match an A-only mapping just because ignoreSourceName is true", () => {
+      const a = [seg(0, 0, 1, 0, 0), seg(1, 0, 2, 0, 0)];
+      const b = [seg(0, 0, 1, 0, 0)];
+      const result = diffMappings(a, b, {
+        sourcesA: ["before.js"],
+        sourcesB: ["after.js"],
+        ignoreSourceName: true,
+      });
+
+      expect(result.summary).toEqual({
+        same: 1,
+        changed: 0,
+        removed: 1,
+        added: 0,
+      });
+    });
+  });
 });
