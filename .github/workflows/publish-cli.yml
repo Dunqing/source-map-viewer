@@ -25,6 +25,10 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       - run: vp run --filter source-map-viewer build
+      # Smoke-test the built artifact via the actual `bin` entry. Catches
+      # mismatches between bin.js's import path and the real dist filename
+      # (e.g. `cli.js` vs `cli.mjs`) before publishing.
+      - run: node packages/cli/bin.js --help > /dev/null
       # Switch registry to npmjs for publish via npm trusted publishing (OIDC).
       - uses: actions/setup-node@v4
         with:

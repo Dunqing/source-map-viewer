@@ -1,10 +1,13 @@
-name: Deploy
+name: PR
+
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
 
 jobs:
-  deploy:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,11 +24,6 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       - run: vp check
       - run: vp test --run
-      # Build + smoke-test the CLI so a broken `bin.js` is caught here
-      # rather than at release tag time.
+      # Build + smoke-test the CLI so a broken `bin.js` is caught at PR time.
       - run: vp run --filter source-map-viewer build
       - run: node packages/cli/bin.js --help > /dev/null
-      - run: vp build
-      - run: vp exec void deploy --project source-map-viewer --skip-build
-        env:
-          VOID_TOKEN: ${{ secrets.VOID_TOKEN }}
