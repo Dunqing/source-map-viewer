@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { resolveFile } from "./resolve.js";
 import { upload } from "./upload.js";
 import { parseSourceMap } from "@core/parser.js";
@@ -11,6 +12,10 @@ import { generateDebugPrompt, analyzeQuality } from "@core/prompt.js";
 import { calculateStats } from "@core/stats.js";
 import { diffMappings } from "@core/diff.js";
 import { extractGeneratedSnippet, extractOriginalSnippet } from "@core/snippets.js";
+
+const VERSION: string = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf-8"),
+).version;
 
 const HELP_TEXT = `
 source-map-viewer — Inspect and debug source map mappings
@@ -29,12 +34,24 @@ Options:
   --ai           Print AI-friendly markdown report to stdout
   --copy         Copy output to clipboard (works with --ai and --url)
   --host <url>   Custom API host (default: https://source-map-viewer.void.app)
-                 Directory inputs must contain one unambiguous source map entrypoint
   -h, --help     Show this help
+  -v, --version  Print version and exit
+
+Notes:
+  Directory inputs must contain one unambiguous source map entrypoint.
+  Long flags accept both --host <url> and --host=<url> forms.
 `.trim();
+
+function splitFlag(arg: string): { name: string; value?: string } {
+  // Handles --foo=bar form. Bare --foo returns { name: "--foo" }.
+  const equals = arg.indexOf("=");
+  if (!arg.startsWith("--") || equals === -1) return { name: arg };
+  return { name: arg.slice(0, equals), value: arg.slice(equals + 1) };
+}
 
 function parseArgs(argv: string[]) {
   let help = false;
+  let version = false;
   let urlOnly = false;
   let aiMode = false;
   let copy = false;
@@ -43,16 +60,20 @@ function parseArgs(argv: string[]) {
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === "--help" || arg === "-h") {
+    const { name, value } = splitFlag(arg);
+
+    if (name === "--help" || name === "-h") {
       help = true;
-    } else if (arg === "--url" || arg === "--no-open") {
+    } else if (name === "--version" || name === "-v") {
+      version = true;
+    } else if (name === "--url" || name === "--no-open") {
       urlOnly = true;
-    } else if (arg === "--ai") {
+    } else if (name === "--ai") {
       aiMode = true;
-    } else if (arg === "--copy") {
+    } else if (name === "--copy") {
       copy = true;
-    } else if (arg === "--host") {
-      host = argv[++i];
+    } else if (name === "--host") {
+      host = value ?? argv[++i];
       if (!host) {
         console.error("Error: --host requires a URL argument");
         process.exit(1);
@@ -65,7 +86,7 @@ function parseArgs(argv: string[]) {
     }
   }
 
-  return { help, urlOnly, aiMode, copy, host, positional };
+  return { help, version, urlOnly, aiMode, copy, host, positional };
 }
 
 async function copyToClipboard(text: string): Promise<void> {
@@ -217,15 +238,23 @@ async function handleCompare(
 
 async function main() {
   const args = process.argv.slice(2);
-  const { help, urlOnly, aiMode, copy, host, positional } = parseArgs(args);
+  const { help, version, urlOnly, aiMode, copy, host, positional } = parseArgs(args);
 
   if (help) {
     console.log(HELP_TEXT);
     process.exit(0);
   }
 
+  if (version) {
+    console.log(VERSION);
+    process.exit(0);
+  }
+
   if (positional.length === 0) {
-    console.log(HELP_TEXT);
+    // No args = the user hasn't told us what to do. Treat as a usage error
+    // (stderr + non-zero exit) so callers chained with `&& open` short-circuit
+    // correctly.
+    console.error(HELP_TEXT);
     process.exit(1);
   }
 

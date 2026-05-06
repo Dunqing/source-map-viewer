@@ -192,7 +192,7 @@ export function resolveFile(filePath: string): ResolvedSourceMap {
       label,
     };
   } catch {
-    // Fall back to treating as source map
+    // Fall back to treating as source map JSON
     try {
       JSON.parse(content); // validate it's JSON
       const sourceMapJson = hydrateFromDisk(content, absolute);
@@ -200,7 +200,11 @@ export function resolveFile(filePath: string): ResolvedSourceMap {
       return { generatedCode, sourceMapJson, label };
     } catch {
       throw new Error(
-        `No source map found for ${label}.\nLooked for: inline sourceMappingURL, external .map reference, ${label}.map`,
+        `Could not interpret ${label} as generated code or as a source map JSON file.\n` +
+          `Expected one of:\n` +
+          `  - generated code (${[...GENERATED_CODE_EXTENSIONS].join(", ")}) with an inline ` +
+          `sourceMappingURL, an external .map reference, or a sibling ${label}.map\n` +
+          `  - a source map (${[...SOURCE_MAP_EXTENSIONS].join(", ")}) JSON file`,
       );
     }
   }
