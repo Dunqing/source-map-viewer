@@ -36,6 +36,13 @@ const props = defineProps<{
   filename: string;
   side: "original" | "generated";
   searchQuery?: string;
+  /**
+   * Optional per-line marker. When set, lines whose 0-based index appears
+   * in the map render a colored dot in the line-number gutter. Used by the
+   * compare page's Code panes to surface which lines carry mapping-diff
+   * entries (without disturbing the syntax highlighting or segment colors).
+   */
+  lineStatuses?: Map<number, "shifted" | "changed" | "removed" | "added">;
 }>();
 
 const emit = defineEmits<{
@@ -291,13 +298,21 @@ function getLineSpans(visibleIdx: number): RenderSpan[] {
   return visibleLineSpans.value[visibleIdx] ?? [];
 }
 
-function getSpanBgColor(span: RenderSpan): string | undefined {
+function getSpanStyle(span: RenderSpan): Record<string, string> | undefined {
   if (!span.segment) return undefined;
   if (isSegmentHovered(span.segment)) {
-    return "var(--seg-hover)";
+    // Background tint + inset ring. The ring is what makes the hover state
+    // findable across panes — on the compare page, the cross-pane echo
+    // applies the same `:hovered` styling on the other side, and a flat
+    // background tint alone reads as "maybe just a slightly different
+    // segment color" until the ring confirms it.
+    return {
+      backgroundColor: "var(--seg-hover)",
+      boxShadow: "inset 0 0 0 1px var(--seg-hover-ring)",
+    };
   }
   if (span.colorIndex === null) return undefined;
-  return `var(--seg-${span.colorIndex})`;
+  return { backgroundColor: `var(--seg-${span.colorIndex})` };
 }
 
 function handleSegmentHover(segment: MappingSegment | null) {
@@ -343,6 +358,18 @@ function scrollToLineIfNeeded(line: number) {
 
 let resizeObserver: ResizeObserver | null = null;
 
+// `positionCache` stores viewport-relative rects from `getBoundingClientRect`.
+// Those go stale not just on this panel's internal scroll (handled in
+// `onVirtualScroll`) but on ANY ancestor scroll — including the page/window
+// scroll on the compare page when its content overflows the viewport.
+// Without this, the `MappingConnector`'s rAF loop keeps drawing the connector
+// at the pre-scroll positions because `getViewportPosition` returns cached
+// values. Capture-phase listener catches scroll on any element since scroll
+// events don't bubble.
+function invalidatePositionCacheOnAnyScroll() {
+  positionCache.clear();
+}
+
 onMounted(() => {
   if (containerRef.value) {
     resizeObserver = new ResizeObserver((entries) => {
@@ -351,10 +378,15 @@ onMounted(() => {
     });
     resizeObserver.observe(containerRef.value);
   }
+  window.addEventListener("scroll", invalidatePositionCacheOnAnyScroll, {
+    capture: true,
+    passive: true,
+  });
 });
 
 onUnmounted(() => {
   resizeObserver?.disconnect();
+  window.removeEventListener("scroll", invalidatePositionCacheOnAnyScroll, { capture: true });
 });
 
 // Position cache — cleared on scroll to avoid stale values in the rAF loop
@@ -467,9 +499,22 @@ defineExpose({
             :style="{ height: `${LINE_HEIGHT}px`, lineHeight: `${LINE_HEIGHT}px` }"
             :class="[searchMatchLines.has(startLine + i) ? 'search-match-line' : '']"
           >
+            <!-- Optional gutter marker for diff-status (used by compare page) -->
+            <span
+              v-if="props.lineStatuses?.has(startLine + i)"
+              class="inline-block w-1.5 h-1.5 rounded-full mx-1 shrink-0"
+              :class="{
+                'bg-blue-500': props.lineStatuses.get(startLine + i) === 'shifted',
+                'bg-amber-500': props.lineStatuses.get(startLine + i) === 'changed',
+                'bg-green-500': props.lineStatuses.get(startLine + i) === 'added',
+                'bg-red-500': props.lineStatuses.get(startLine + i) === 'removed',
+              }"
+              :title="`mapping diff: ${props.lineStatuses.get(startLine + i)}`"
+            />
+            <span v-else class="inline-block w-1.5 h-1.5 mx-1 shrink-0" aria-hidden="true" />
             <!-- Line number -->
             <span
-              class="inline-block w-12 text-right pr-3 text-fg-muted select-none shrink-0 text-xs"
+              class="inline-block w-10 text-right pr-3 text-fg-muted select-none shrink-0 text-xs"
             >
               {{ startLine + i + 1 }}
             </span>
@@ -480,7 +525,7 @@ defineExpose({
                 :key="j"
                 :style="{
                   color: span.textColor,
-                  backgroundColor: getSpanBgColor(span),
+                  ...getSpanStyle(span),
                 }"
                 :class="{
                   'cursor-pointer rounded-sm': span.segment !== null,

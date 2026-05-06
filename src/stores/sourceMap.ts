@@ -1,4 +1,14 @@
-import { computed, reactive, ref, shallowRef } from "vue";
+import {
+  computed,
+  getCurrentInstance,
+  inject,
+  provide,
+  reactive,
+  ref,
+  shallowRef,
+  type InjectionKey,
+  type UnwrapNestedRefs,
+} from "vue";
 import type { ResolvedFileCollection } from "../core/inputResolver";
 import type {
   InverseMappingIndex,
@@ -221,8 +231,38 @@ function createSourceMapStore() {
   };
 }
 
-const store = reactive(createSourceMapStore());
+export type SourceMapStore = UnwrapNestedRefs<ReturnType<typeof createSourceMapStore>>;
 
-export function useSourceMapStore() {
-  return store;
+/**
+ * The global default store, used by the single-document viewer page and
+ * anything outside a provider. Multi-instance contexts (the compare page)
+ * should call `provideSourceMapStore()` in a parent to create a fresh
+ * instance scoped to that subtree.
+ */
+const defaultStore: SourceMapStore = reactive(createSourceMapStore());
+
+const STORE_KEY: InjectionKey<SourceMapStore> = Symbol("sourceMapStore");
+
+/**
+ * Create a fresh store and provide it to descendants. Components below this
+ * point that call `useSourceMapStore()` see the local instance instead of
+ * the singleton. Useful when mounting multiple sourcemap views in the same
+ * page that should keep independent hover / active-source / scroll state.
+ */
+export function provideSourceMapStore(): SourceMapStore {
+  const instance: SourceMapStore = reactive(createSourceMapStore());
+  provide(STORE_KEY, instance);
+  return instance;
+}
+
+export function useSourceMapStore(): SourceMapStore {
+  // `inject` only works inside a Vue setup context — outside that (tests
+  // calling this from `beforeEach`, composables called early, etc.) it
+  // returns undefined regardless of any default. Fall back to the singleton
+  // so callers always get a usable store.
+  if (getCurrentInstance()) {
+    const provided = inject(STORE_KEY, undefined as SourceMapStore | undefined);
+    if (provided) return provided;
+  }
+  return defaultStore;
 }

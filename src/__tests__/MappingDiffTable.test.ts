@@ -36,7 +36,13 @@ function seg(
 function mountTable(
   entries: DiffEntry[],
   overrides: Partial<{
-    summary: { same: number; changed: number; removed: number; added: number };
+    summary: {
+      same: number;
+      shifted: number;
+      changed: number;
+      removed: number;
+      added: number;
+    };
     sourcesA: string[];
     sourcesB: string[];
     genLinesA: string[];
@@ -51,7 +57,7 @@ function mountTable(
   return mount(MappingDiffTable, {
     props: {
       entries,
-      summary: { same: 0, changed: 0, removed: 0, added: 0 },
+      summary: { same: 0, shifted: 0, changed: 0, removed: 0, added: 0 },
       sourcesA: ["input.ts"],
       sourcesB: ["input.ts"],
       genLinesA: ["const value = 1;"],
@@ -79,7 +85,7 @@ describe("MappingDiffTable", () => {
     };
 
     const wrapper = mountTable([entry], {
-      summary: { same: 0, changed: 1, removed: 0, added: 0 },
+      summary: { same: 0, shifted: 0, changed: 1, removed: 0, added: 0 },
       sourcesA: ["./input.ts"],
       sourcesB: ["input.ts"],
     });
@@ -96,7 +102,7 @@ describe("MappingDiffTable", () => {
     };
 
     const wrapper = mountTable([removed], {
-      summary: { same: 0, changed: 0, removed: 1, added: 0 },
+      summary: { same: 0, shifted: 0, changed: 0, removed: 1, added: 0 },
       rawMappingsA: [removed.a!],
       rawMappingsB: [seg(0, 2, 0, 0)],
     });
@@ -111,38 +117,6 @@ describe("MappingDiffTable", () => {
     expect(diffModule.findNearestMappingInSameSource).toHaveBeenCalledTimes(1);
   });
 
-  it("renders the Ignore source filename checkbox bound to ignoreSourceName prop", () => {
-    const wrapper = mountTable([], {
-      summary: { same: 0, changed: 0, removed: 0, added: 0 },
-      ignoreSourceName: true,
-    });
-
-    const checkboxes = wrapper.findAll("input[type='checkbox']");
-    const ignoreCheckbox = checkboxes.find((c) =>
-      c.element.parentElement?.textContent?.includes("Ignore source filename"),
-    );
-    expect(ignoreCheckbox).toBeDefined();
-    expect((ignoreCheckbox!.element as HTMLInputElement).checked).toBe(true);
-  });
-
-  it("emits update:ignoreSourceName when the checkbox is toggled", async () => {
-    const wrapper = mountTable([], {
-      summary: { same: 0, changed: 0, removed: 0, added: 0 },
-      ignoreSourceName: false,
-    });
-
-    const checkboxes = wrapper.findAll("input[type='checkbox']");
-    const ignoreCheckbox = checkboxes.find((c) =>
-      c.element.parentElement?.textContent?.includes("Ignore source filename"),
-    );
-    expect(ignoreCheckbox).toBeDefined();
-
-    await ignoreCheckbox!.setValue(true);
-
-    expect(wrapper.emitted("update:ignoreSourceName")).toBeTruthy();
-    expect(wrapper.emitted("update:ignoreSourceName")![0]).toEqual([true]);
-  });
-
   it("renders a single row and a rename chip when only the source filename differs", () => {
     const entry: DiffEntry = {
       status: "changed",
@@ -151,7 +125,7 @@ describe("MappingDiffTable", () => {
     };
 
     const wrapper = mountTable([entry], {
-      summary: { same: 0, changed: 1, removed: 0, added: 0 },
+      summary: { same: 0, shifted: 0, changed: 1, removed: 0, added: 0 },
       sourcesA: ["before.js"],
       sourcesB: ["after.js"],
       origLinesA: [["const value = 1;"]],
@@ -174,7 +148,7 @@ describe("MappingDiffTable", () => {
     };
 
     const wrapper = mountTable([entry], {
-      summary: { same: 0, changed: 1, removed: 0, added: 0 },
+      summary: { same: 0, shifted: 0, changed: 1, removed: 0, added: 0 },
       sourcesA: ["before.js"],
       sourcesB: ["after.js"],
       origLinesA: [["const value = 1;"]],
@@ -201,7 +175,7 @@ describe("MappingDiffTable", () => {
     };
 
     const wrapper = mountTable([entry], {
-      summary: { same: 0, changed: 1, removed: 0, added: 0 },
+      summary: { same: 0, shifted: 0, changed: 1, removed: 0, added: 0 },
       sourcesA: ["input.ts"],
       sourcesB: ["input.ts"],
       origLinesA: [["const value = 1;", "    let other = 2;"]],
@@ -215,7 +189,7 @@ describe("MappingDiffTable", () => {
 
   it("explains the empty state when ignoreSourceName re-classifies all entries as same", () => {
     const wrapper = mountTable([], {
-      summary: { same: 5, changed: 0, removed: 0, added: 0 },
+      summary: { same: 5, shifted: 0, changed: 0, removed: 0, added: 0 },
       ignoreSourceName: true,
     });
 
@@ -225,10 +199,47 @@ describe("MappingDiffTable", () => {
 
   it("uses the default empty-state copy when no entries exist and ignoreSourceName is off", () => {
     const wrapper = mountTable([], {
-      summary: { same: 0, changed: 0, removed: 0, added: 0 },
+      summary: { same: 0, shifted: 0, changed: 0, removed: 0, added: 0 },
       ignoreSourceName: false,
     });
 
     expect(wrapper.text()).toContain("No differences found. Source maps are identical");
+  });
+
+  it("restricts visible rows when filterEntries is provided", () => {
+    const a = seg(0, 0, 0, 0);
+    const b = seg(0, 5, 0, 5);
+    const c = seg(0, 10, 0, 10);
+    const entries: DiffEntry[] = [
+      { status: "changed", a, b: seg(0, 0, 0, 1) },
+      { status: "changed", a: b, b: seg(0, 5, 0, 6) },
+      { status: "changed", a: c, b: seg(0, 10, 0, 11) },
+    ];
+    const filterEntries = [entries[0], entries[2]];
+    const wrapper = mount(MappingDiffTable, {
+      props: {
+        entries,
+        summary: { same: 0, shifted: 0, changed: 3, removed: 0, added: 0 },
+        sourcesA: ["input.ts"],
+        sourcesB: ["input.ts"],
+        genLinesA: ["a b c"],
+        genLinesB: ["a b c"],
+        origLinesA: [["a b c"]],
+        origLinesB: [["a b c"]],
+        rawMappingsA: [],
+        rawMappingsB: [],
+        ignoreSourceName: false,
+        filterEntries,
+      },
+    });
+
+    // Only the two filtered entries should render rows; the middle entry
+    // (gen 0:5 → displayed as 1:5 since the table uses 1-based lines)
+    // should not appear in the visible row text.
+    const text = wrapper.text();
+    expect(text).toContain("1:0");
+    expect(text).toContain("1:10");
+    // The unfiltered row's gen position should be absent.
+    expect(text).not.toMatch(/\b1:5\b/);
   });
 });

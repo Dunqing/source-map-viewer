@@ -23,17 +23,14 @@ function seg(
   };
 }
 
+const EMPTY_SUMMARY = { same: 0, shifted: 0, changed: 0, removed: 0, added: 0 };
+
 describe("diffMappings", () => {
   it("reports all same when mappings are identical", () => {
     const mappings = [seg(0, 0, 1, 0), seg(0, 5, 2, 3), seg(1, 0, 3, 0)];
     const result = diffMappings(mappings, mappings);
 
-    expect(result.summary).toEqual({
-      same: 3,
-      changed: 0,
-      removed: 0,
-      added: 0,
-    });
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, same: 3 });
     for (const entry of result.entries) {
       expect(entry.status).toBe("same");
       expect(entry.a).not.toBeNull();
@@ -41,33 +38,26 @@ describe("diffMappings", () => {
     }
   });
 
-  it("detects changed mapping when original position differs", () => {
+  it("classifies as changed when only original position differs (gen pinned)", () => {
     const a = [seg(0, 0, 1, 0)];
     const b = [seg(0, 0, 5, 10)];
     const result = diffMappings(a, b);
 
-    expect(result.summary).toEqual({
-      same: 0,
-      changed: 1,
-      removed: 0,
-      added: 0,
-    });
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, changed: 1 });
     expect(result.entries[0].status).toBe("changed");
     expect(result.entries[0].a).toEqual(a[0]);
     expect(result.entries[0].b).toEqual(b[0]);
+    // Even non-shifted paired entries carry the Δ vector so the pattern
+    // detector can group by movement shape regardless of status.
+    expect(result.entries[0].shift).toEqual({ genLine: 0, genCol: 0, srcLine: 4, srcCol: 10 });
   });
 
-  it("detects changed mapping when generated position differs but original position stays the same", () => {
+  it("classifies as changed when only generated position differs (src pinned)", () => {
     const a = [seg(0, 0, 1, 0), seg(1, 0, 2, 0)];
     const b = [seg(0, 2, 1, 0), seg(1, 4, 2, 0)];
     const result = diffMappings(a, b);
 
-    expect(result.summary).toEqual({
-      same: 0,
-      changed: 2,
-      removed: 0,
-      added: 0,
-    });
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, changed: 2 });
     expect(result.entries.map((entry) => entry.status)).toEqual(["changed", "changed"]);
   });
 
@@ -79,12 +69,7 @@ describe("diffMappings", () => {
       sourcesB: ["b.ts", "a.ts"],
     });
 
-    expect(result.summary).toEqual({
-      same: 0,
-      changed: 1,
-      removed: 0,
-      added: 0,
-    });
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, changed: 1 });
     expect(result.entries[0].status).toBe("changed");
   });
 
@@ -96,12 +81,7 @@ describe("diffMappings", () => {
       sourcesB: ["input.ts"],
     });
 
-    expect(result.summary).toEqual({
-      same: 1,
-      changed: 0,
-      removed: 0,
-      added: 0,
-    });
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, same: 1 });
     expect(result.entries[0].status).toBe("same");
   });
 
@@ -110,12 +90,7 @@ describe("diffMappings", () => {
     const b = [seg(0, 0, 1, 0)];
     const result = diffMappings(a, b);
 
-    expect(result.summary).toEqual({
-      same: 1,
-      changed: 0,
-      removed: 1,
-      added: 0,
-    });
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, same: 1, removed: 1 });
     const removed = result.entries.find((e) => e.status === "removed");
     expect(removed).toBeDefined();
     expect(removed!.a).toEqual(seg(0, 5, 2, 3));
@@ -127,12 +102,7 @@ describe("diffMappings", () => {
     const b = [seg(0, 0, 1, 0), seg(1, 0, 3, 0)];
     const result = diffMappings(a, b);
 
-    expect(result.summary).toEqual({
-      same: 1,
-      changed: 0,
-      removed: 0,
-      added: 1,
-    });
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, same: 1, added: 1 });
     const added = result.entries.find((e) => e.status === "added");
     expect(added).toBeDefined();
     expect(added!.a).toBeNull();
@@ -145,12 +115,7 @@ describe("diffMappings", () => {
     const b = [{ ...seg(0, 0, 1, 0), nameIndex: 0 }];
     const result = diffMappings(a, b, { namesA: ["foo"], namesB: ["bar"] });
 
-    expect(result.summary).toEqual({
-      same: 0,
-      changed: 1,
-      removed: 0,
-      added: 0,
-    });
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, changed: 1 });
   });
 
   it("treats name-equivalent mappings as same even when nameIndex differs (different names arrays)", () => {
@@ -162,31 +127,17 @@ describe("diffMappings", () => {
       namesB: ["bar", "foo"],
     });
 
-    expect(result.summary).toEqual({
-      same: 1,
-      changed: 0,
-      removed: 0,
-      added: 0,
-    });
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, same: 1 });
   });
 
   it("handles empty inputs", () => {
-    expect(diffMappings([], []).summary).toEqual({
-      same: 0,
-      changed: 0,
-      removed: 0,
-      added: 0,
-    });
+    expect(diffMappings([], []).summary).toEqual(EMPTY_SUMMARY);
     expect(diffMappings([seg(0, 0, 1, 0)], []).summary).toEqual({
-      same: 0,
-      changed: 0,
+      ...EMPTY_SUMMARY,
       removed: 1,
-      added: 0,
     });
     expect(diffMappings([], [seg(0, 0, 1, 0)]).summary).toEqual({
-      same: 0,
-      changed: 0,
-      removed: 0,
+      ...EMPTY_SUMMARY,
       added: 1,
     });
   });
@@ -194,29 +145,24 @@ describe("diffMappings", () => {
   it("handles mixed diff with same, changed, removed, and added", () => {
     const a = [
       seg(0, 0, 1, 0), // same in both
-      seg(0, 5, 2, 3), // will change
-      seg(1, 0, 3, 0), // removed (not in B)
+      seg(0, 5, 2, 3), // will change (gen pinned, src jumps lines)
+      seg(1, 0, 3, 0), // removed — far enough from any B mapping that no pair fits
     ];
     const b = [
       seg(0, 0, 1, 0), // same in both
       seg(0, 5, 9, 9), // changed original position
-      seg(2, 0, 4, 0), // added (not in A)
+      seg(20, 0, 50, 0), // added — far from A's gen lines so it can't pair
     ];
     const result = diffMappings(a, b);
 
-    expect(result.summary).toEqual({
-      same: 1,
-      changed: 1,
-      removed: 1,
-      added: 1,
-    });
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, same: 1, changed: 1, removed: 1, added: 1 });
     expect(result.entries).toHaveLength(4);
 
     // Verify sort order: entries sorted by generated position
     expect(result.entries[0].status).toBe("same"); // 0:0
     expect(result.entries[1].status).toBe("changed"); // 0:5
     expect(result.entries[2].status).toBe("removed"); // 1:0
-    expect(result.entries[3].status).toBe("added"); // 2:0
+    expect(result.entries[3].status).toBe("added"); // 20:0
   });
 
   it("pairs generated shifts before reporting removed and added mappings", () => {
@@ -225,12 +171,7 @@ describe("diffMappings", () => {
 
     const result = diffMappings(a, b);
 
-    expect(result.summary).toEqual({
-      same: 0,
-      changed: 2,
-      removed: 1,
-      added: 0,
-    });
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, changed: 2, removed: 1 });
   });
 
   it("finds an exact raw counterpart even when compare-visible mappings might hide it", () => {
@@ -261,12 +202,7 @@ describe("diffMappings", () => {
         ignoreSourceName: true,
       });
 
-      expect(result.summary).toEqual({
-        same: 1,
-        changed: 0,
-        removed: 0,
-        added: 0,
-      });
+      expect(result.summary).toEqual({ ...EMPTY_SUMMARY, same: 1 });
       expect(result.entries[0].status).toBe("same");
     });
 
@@ -278,12 +214,10 @@ describe("diffMappings", () => {
         sourcesB: ["after.js"],
       });
 
-      expect(result.summary).toEqual({
-        same: 0,
-        changed: 1,
-        removed: 0,
-        added: 0,
-      });
+      // Source mismatch is treated as a rename, not a hard reject — pairs
+      // anyway with status "changed" so the UI can render the rename inline
+      // instead of showing twin removed/added rows.
+      expect(result.summary).toEqual({ ...EMPTY_SUMMARY, changed: 1 });
       expect(result.entries[0].status).toBe("changed");
     });
 
@@ -296,12 +230,7 @@ describe("diffMappings", () => {
         ignoreSourceName: true,
       });
 
-      expect(result.summary).toEqual({
-        same: 0,
-        changed: 1,
-        removed: 0,
-        added: 0,
-      });
+      expect(result.summary).toEqual({ ...EMPTY_SUMMARY, changed: 1 });
       expect(result.entries[0].status).toBe("changed");
     });
 
@@ -314,12 +243,98 @@ describe("diffMappings", () => {
         ignoreSourceName: true,
       });
 
-      expect(result.summary).toEqual({
-        same: 1,
-        changed: 0,
-        removed: 1,
-        added: 0,
-      });
+      expect(result.summary).toEqual({ ...EMPTY_SUMMARY, same: 1, removed: 1 });
+    });
+  });
+
+  describe("shifted classification", () => {
+    it("classifies a uniform off-by-one shift on three mappings", () => {
+      // Models the oxc PR #22001 case: three end-tokens whose source AND
+      // generated positions both moved left by exactly 1 column.
+      const a = [seg(4, 19, 4, 25), seg(7, 9, 7, 9), seg(7, 11, 7, 11)];
+      const b = [seg(4, 18, 4, 24), seg(7, 8, 7, 8), seg(7, 10, 7, 10)];
+
+      const result = diffMappings(a, b);
+
+      expect(result.summary).toEqual({ ...EMPTY_SUMMARY, shifted: 3 });
+      for (const entry of result.entries) {
+        expect(entry.status).toBe("shifted");
+        expect(entry.shift).toEqual({ genLine: 0, genCol: -1, srcLine: 0, srcCol: -1 });
+      }
+    });
+
+    it("classifies as shifted when both gen and src move by small amounts on the same line", () => {
+      const a = [seg(0, 5, 1, 10)];
+      const b = [seg(0, 7, 1, 12)];
+      const result = diffMappings(a, b);
+
+      expect(result.summary).toEqual({ ...EMPTY_SUMMARY, shifted: 1 });
+      expect(result.entries[0].status).toBe("shifted");
+      expect(result.entries[0].shift).toEqual({ genLine: 0, genCol: 2, srcLine: 0, srcCol: 2 });
+    });
+
+    it("does not classify as shifted when only one side moves (other axis pinned)", () => {
+      const a = [seg(0, 5, 1, 10)];
+      const b = [seg(0, 5, 1, 12)];
+      const result = diffMappings(a, b);
+
+      expect(result.summary).toEqual({ ...EMPTY_SUMMARY, changed: 1 });
+      expect(result.entries[0].status).toBe("changed");
+      // Δ vector still recorded for downstream pattern detection — only the
+      // status differs from "shifted".
+      expect(result.entries[0].shift).toEqual({ genLine: 0, genCol: 0, srcLine: 0, srcCol: 2 });
+    });
+
+    it("does not classify as shifted when the shift exceeds the small-shift column threshold", () => {
+      // 6 cols on either side — beyond SHIFT_COL_LIMIT (=5).
+      const a = [seg(0, 5, 1, 10)];
+      const b = [seg(0, 11, 1, 16)];
+      const result = diffMappings(a, b);
+
+      // Falls through to the bounded-movement-on-both-axes branch (cost ~100+),
+      // so it pairs as `changed`.
+      expect(result.summary).toEqual({ ...EMPTY_SUMMARY, changed: 1 });
+    });
+
+    it("uses removed+added when a paired distance is too large to bridge", () => {
+      // Same gen line but src jumped by >1 line AND gen also moved by >1 line
+      // — neither the same-axis nor the bounded-relocation branches accept it.
+      const a = [seg(0, 0, 1, 0)];
+      const b = [seg(5, 50, 50, 100)];
+      const result = diffMappings(a, b);
+
+      expect(result.summary).toEqual({ ...EMPTY_SUMMARY, removed: 1, added: 1 });
+    });
+
+    it("calibration: prefers natural single-axis pairs over bilateral cross-pairs", () => {
+      // The off-by-one closing-delimiter scenario: A has end-tokens at gen
+      // cols 9 and 11 with src cols 9 and 11; B has the same gen cols but
+      // src cols shifted by -1. Greedy by ascending cost MUST pair A1↔B1
+      // and A2↔B2 (single-axis, Δsrc=(0,-1)) instead of crossing to
+      // A1↔B2 / A2↔B1 (bilateral with larger Δs).
+      //
+      // This test guards the cost-base calibration: if anyone tweaks
+      // COST_BILATERAL_SHIFT_BASE or COST_SINGLE_AXIS_BASE such that
+      // bilateral becomes cheaper than single-axis for adjacent pairs,
+      // the matcher would silently pick the wrong pairing.
+      const a = [seg(7, 0, 7, 0), seg(7, 9, 7, 9), seg(7, 11, 7, 11)];
+      const b = [seg(7, 0, 7, 0), seg(7, 9, 7, 8), seg(7, 11, 7, 10)];
+      const result = diffMappings(a, b);
+
+      const offByOne = result.entries.filter(
+        (entry) =>
+          entry.shift?.genLine === 0 &&
+          entry.shift?.genCol === 0 &&
+          entry.shift?.srcLine === 0 &&
+          entry.shift?.srcCol === -1,
+      );
+      // Both off-by-one mappings should be paired with their natural
+      // counterparts (A.gen 9 ↔ B.gen 9, A.gen 11 ↔ B.gen 11), not crossed.
+      expect(offByOne).toHaveLength(2);
+      // The exact-position mapping at 7:0 stays `same`.
+      expect(result.summary.same).toBe(1);
+      // No bilateral-shift cross-pairs sneaked in.
+      expect(result.summary.shifted).toBe(0);
     });
   });
 });

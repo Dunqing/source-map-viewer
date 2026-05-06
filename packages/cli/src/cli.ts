@@ -11,6 +11,7 @@ import { findTokenSplitSegments, validateMappings } from "@core/validator.js";
 import { generateDebugPrompt, analyzeQuality } from "@core/prompt.js";
 import { calculateStats } from "@core/stats.js";
 import { diffMappings } from "@core/diff.js";
+import { detectPatterns } from "@core/patterns.js";
 import { extractGeneratedSnippet, extractOriginalSnippet } from "@core/snippets.js";
 
 const VERSION: string = JSON.parse(
@@ -141,6 +142,11 @@ function formatDiffMarkdown(
     return `${src} ${seg.originalLine + 1}:${seg.originalColumn} \`${code}\``;
   }
 
+  const patterns = detectPatterns(entries, {
+    sourcesA: parsedA.sources,
+    sourcesB: parsedB.sources,
+  });
+
   const lines = [
     "# Source Map Diff Report",
     "",
@@ -150,13 +156,31 @@ function formatDiffMarkdown(
     "## Summary",
     "",
     `- **Same:** ${summary.same}`,
+    `- **Shifted:** ${summary.shifted} (paired, bounded same-line shift on both axes)`,
     `- **Changed:** ${summary.changed}`,
     `- **Removed:** ${summary.removed} (in A but not B)`,
     `- **Added:** ${summary.added} (in B but not A)`,
     "",
   ];
 
-  if (summary.changed + summary.removed + summary.added === 0) {
+  if (patterns.length > 0) {
+    // Cap pattern listing so a sourcemap with hundreds of unrelated changes
+    // doesn't blow up the AI report. The most-impactful patterns are first
+    // (`detectPatterns` sorts by member count desc), so the cap drops noise
+    // not signal.
+    const MAX_PATTERNS = 20;
+    lines.push("## Patterns", "");
+    for (const pattern of patterns.slice(0, MAX_PATTERNS)) {
+      lines.push(`- **${pattern.kind}**: ${pattern.description}`);
+    }
+    if (patterns.length > MAX_PATTERNS) {
+      lines.push(`- _…and ${patterns.length - MAX_PATTERNS} more patterns omitted_`);
+    }
+    lines.push("");
+  }
+
+  const diffCount = summary.shifted + summary.changed + summary.removed + summary.added;
+  if (diffCount === 0) {
     lines.push("Source maps are identical.", "");
   } else {
     lines.push("## Changed Mappings", "");
@@ -171,7 +195,16 @@ function formatDiffMarkdown(
         seg.generatedColumn,
       );
 
-      lines.push(`### ${entry.status.toUpperCase()} at ${gen}: \`${genCode}\``);
+      const deltaSuffix = entry.shift
+        ? ` — Δsrc (${entry.shift.srcLine},${entry.shift.srcCol}) · Δgen (${entry.shift.genLine},${entry.shift.genCol})`
+        : "";
+      // A `changed` entry with no movement vector means the only difference
+      // between A and B is the source filename. Surface as `RENAMED` so the
+      // report distinguishes pure renames from genuine position changes.
+      const isPureRename =
+        entry.status === "changed" && entry.a !== null && entry.b !== null && !entry.shift;
+      const label = isPureRename ? "RENAMED" : entry.status.toUpperCase();
+      lines.push(`### ${label} at ${gen}: \`${genCode}\`${deltaSuffix}`);
       if (entry.a) lines.push(`- **A →** ${origSnippet(entry, "a")}`);
       if (entry.b) lines.push(`- **B →** ${origSnippet(entry, "b")}`);
       lines.push("");

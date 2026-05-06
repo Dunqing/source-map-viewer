@@ -8,6 +8,7 @@ import {
 import type { DiffEntry, DiffSummary } from "../core/diff";
 import type { MappingSegment } from "../core/types";
 import { extractGeneratedSnippet, extractOriginalSnippet } from "../core/snippets";
+import PointSnippetView from "./PointSnippetView.vue";
 
 const props = defineProps<{
   entries: DiffEntry[];
@@ -23,16 +24,13 @@ const props = defineProps<{
   rawMappingsA: MappingSegment[];
   rawMappingsB: MappingSegment[];
   ignoreSourceName: boolean;
+  /**
+   * When non-null, restrict the visible rows to these specific DiffEntry
+   * objects (identity comparison). Driven by PatternSummary's pattern
+   * selection — clicking a pattern card filters the table to its members.
+   */
+  filterEntries?: DiffEntry[] | null;
 }>();
-
-const emit = defineEmits<{
-  "update:ignoreSourceName": [value: boolean];
-}>();
-
-const ignoreSourceNameModel = computed({
-  get: () => props.ignoreSourceName,
-  set: (value: boolean) => emit("update:ignoreSourceName", value),
-});
 
 const showSame = ref(false);
 const expandedIndex = ref<string | null>(null);
@@ -55,9 +53,15 @@ interface EntryPreviewData {
   b: PreviewSideData;
 }
 
-const filteredEntries = computed(() =>
-  showSame.value ? props.entries : props.entries.filter((e) => e.status !== "same"),
-);
+const filteredEntries = computed(() => {
+  let entries = props.entries;
+  if (props.filterEntries) {
+    const allowed = new Set(props.filterEntries);
+    entries = entries.filter((e) => allowed.has(e));
+  }
+  if (!showSame.value) entries = entries.filter((e) => e.status !== "same");
+  return entries;
+});
 
 function segmentKey(seg: MappingSegment | null): string {
   if (!seg) return "none";
@@ -83,6 +87,8 @@ function statusIcon(status: DiffEntry["status"]): string {
   switch (status) {
     case "same":
       return "=";
+    case "shifted":
+      return "≈";
     case "changed":
       return "~";
     case "removed":
@@ -117,26 +123,60 @@ function clampColumn(lineText: string, column: number): number {
   return Math.max(0, Math.min(lineText.length, column));
 }
 
+/**
+ * A snippet of `lineText` centered on `column`, split into the parts a
+ * template can style independently. The `point` char is the mapping
+ * target — the template renders it with a colored underline so the cursor
+ * is visible without colliding with the natural `()` / `[]` punctuation
+ * of the surrounding code (the prior `[char]` literal-bracket form was
+ * unreadable inside JS expressions).
+ */
+interface PointSnippet {
+  prefix: string;
+  before: string;
+  point: string;
+  after: string;
+  suffix: string;
+  /** True when the column lands past the end of the line, so `point`
+   *  is a synthetic " " rather than a real character. */
+  pointIsSynthetic: boolean;
+}
+
 function formatPointSnippet(
   lineText: string,
   column: number,
   { visibleWhitespace = false, radius = 18 }: { visibleWhitespace?: boolean; radius?: number } = {},
-): string {
+): PointSnippet {
   const clamped = clampColumn(lineText, column);
   const start = Math.max(0, clamped - Math.floor(radius / 2));
   const end = Math.min(lineText.length, clamped + radius);
+  const realPoint = lineText.slice(clamped, Math.min(lineText.length, clamped + 1));
   const before = lineText.slice(start, clamped);
-  const point = lineText.slice(clamped, Math.min(lineText.length, clamped + 1)) || " ";
+  const point = realPoint || " ";
   const after = lineText.slice(Math.min(lineText.length, clamped + 1), end);
   const format = visibleWhitespace ? formatVisibleWhitespace : (s: string) => s;
-  const prefix = start > 0 ? "..." : "";
-  const suffix = end < lineText.length ? "..." : "";
-  return `${prefix}${format(before)}[${format(point)}]${format(after)}${suffix}`;
+  return {
+    prefix: start > 0 ? "..." : "",
+    before: format(before),
+    point: format(point),
+    after: format(after),
+    suffix: end < lineText.length ? "..." : "",
+    pointIsSynthetic: realPoint.length === 0,
+  };
 }
 
-function generatedDiffSnippet(entry: DiffEntry, side: "a" | "b"): string {
+const EMPTY_POINT_SNIPPET: PointSnippet = {
+  prefix: "",
+  before: "",
+  point: "",
+  after: "",
+  suffix: "",
+  pointIsSynthetic: false,
+};
+
+function generatedDiffSnippet(entry: DiffEntry, side: "a" | "b"): PointSnippet {
   const seg = entry[side];
-  if (!seg) return "";
+  if (!seg) return EMPTY_POINT_SNIPPET;
   const lines = side === "a" ? props.genLinesA : props.genLinesB;
   const line = lines[seg.generatedLine] ?? "";
   return formatPointSnippet(line, seg.generatedColumn, { visibleWhitespace: true });
@@ -159,9 +199,15 @@ function originalSourceName(entry: DiffEntry, side: "a" | "b"): string {
   return normalizedSourceLabel(sources[seg.sourceIndex], seg.sourceIndex);
 }
 
+function isPaired(entry: DiffEntry): boolean {
+  return (entry.status === "same" ||
+    entry.status === "shifted" ||
+    entry.status === "changed") as boolean;
+}
+
 function isGeneratedChanged(entry: DiffEntry): boolean {
   return !!(
-    entry.status === "changed" &&
+    isPaired(entry) &&
     entry.a &&
     entry.b &&
     (entry.a.generatedLine !== entry.b.generatedLine ||
@@ -171,7 +217,7 @@ function isGeneratedChanged(entry: DiffEntry): boolean {
 
 function sourceNameDiffers(entry: DiffEntry): boolean {
   return (
-    entry.status === "changed" &&
+    isPaired(entry) &&
     !!entry.a &&
     !!entry.b &&
     originalSourceName(entry, "a") !== originalSourceName(entry, "b")
@@ -218,9 +264,9 @@ function origCode(entry: DiffEntry, side: "a" | "b"): string {
   return extractOriginalSnippet(sourceLines, seg.originalLine, seg.originalColumn);
 }
 
-function originalDiffSnippet(entry: DiffEntry, side: "a" | "b"): string {
+function originalDiffSnippet(entry: DiffEntry, side: "a" | "b"): PointSnippet {
   const seg = entry[side];
-  if (!seg) return "";
+  if (!seg) return EMPTY_POINT_SNIPPET;
   const allLines = side === "a" ? props.origLinesA : props.origLinesB;
   const sourceLines = allLines[seg.sourceIndex] ?? [];
   const line = sourceLines[seg.originalLine] ?? "";
@@ -523,6 +569,8 @@ function collapsedStatusLabel(entry: DiffEntry): string | null {
 
 function statusClass(status: DiffEntry["status"]): string {
   switch (status) {
+    case "shifted":
+      return "bg-blue-50 dark:bg-blue-900/20";
     case "changed":
       return "bg-amber-50 dark:bg-amber-900/20";
     case "removed":
@@ -536,6 +584,8 @@ function statusClass(status: DiffEntry["status"]): string {
 
 function statusTextClass(status: DiffEntry["status"]): string {
   switch (status) {
+    case "shifted":
+      return "text-blue-600 dark:text-blue-400";
     case "changed":
       return "text-amber-600 dark:text-amber-400";
     case "removed":
@@ -555,6 +605,13 @@ function statusTextClass(status: DiffEntry["status"]): string {
       class="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface border border-edge text-xs font-mono mb-3"
     >
       <span class="text-fg-muted">{{ summary.same }} same</span>
+      <span
+        v-if="summary.shifted > 0"
+        class="text-blue-600 dark:text-blue-400 font-semibold"
+        :title="`${summary.shifted} mappings paired with bounded same-line shift on both axes`"
+      >
+        {{ summary.shifted }} shifted
+      </span>
       <span class="text-amber-600 dark:text-amber-400 font-semibold">
         {{ summary.changed }} changed
       </span>
@@ -565,10 +622,9 @@ function statusTextClass(status: DiffEntry["status"]): string {
         {{ summary.added }} added
       </span>
       <span class="ml-auto flex items-center gap-3">
-        <label class="flex items-center gap-1.5 cursor-pointer text-fg-muted">
-          <input v-model="ignoreSourceNameModel" type="checkbox" class="rounded" />
-          Ignore source filename
-        </label>
+        <!-- "Ignore source filename" lives on the CompareView header now so
+             it applies globally (Code panes & Lookup delta consume it too).
+             Only the table-local "Show identical" toggle stays here. -->
         <label class="flex items-center gap-1.5 cursor-pointer text-fg-muted">
           <input v-model="showSame" type="checkbox" class="rounded" />
           Show identical
@@ -634,9 +690,13 @@ function statusTextClass(status: DiffEntry["status"]): string {
                     {{ originalSourceName(entry, "a") }}
                   </span>
                   <span class="text-fg-muted">{{ origPos(entry, "a") }}</span>
-                  <code class="text-red-500 line-through truncate">{{
-                    originalDiffSnippet(entry, "a")
-                  }}</code>
+                  <code class="text-red-500 truncate">
+                    <PointSnippetView
+                      :snippet="originalDiffSnippet(entry, 'a')"
+                      tone="red"
+                      line-through
+                    />
+                  </code>
                 </div>
                 <div class="flex items-center gap-1.5">
                   <span class="text-green-600 dark:text-green-400 font-semibold w-6">B:</span>
@@ -647,9 +707,9 @@ function statusTextClass(status: DiffEntry["status"]): string {
                     {{ originalSourceName(entry, "b") }}
                   </span>
                   <span class="text-fg-muted">{{ origPos(entry, "b") }}</span>
-                  <code class="text-green-600 dark:text-green-400 truncate">{{
-                    originalDiffSnippet(entry, "b")
-                  }}</code>
+                  <code class="text-green-600 dark:text-green-400 truncate">
+                    <PointSnippetView :snippet="originalDiffSnippet(entry, 'b')" tone="green" />
+                  </code>
                 </div>
               </div>
               <div v-else class="flex items-center gap-1.5">
@@ -661,15 +721,17 @@ function statusTextClass(status: DiffEntry["status"]): string {
             <template v-else-if="entry.status === 'removed'">
               <div class="flex items-center gap-1.5">
                 <span class="text-fg-muted">{{ origPos(entry, "a") }}</span>
-                <code class="text-red-500 truncate">{{ originalDiffSnippet(entry, "a") }}</code>
+                <code class="text-red-500 truncate">
+                  <PointSnippetView :snippet="originalDiffSnippet(entry, 'a')" tone="red" />
+                </code>
               </div>
             </template>
             <template v-else-if="entry.status === 'added'">
               <div class="flex items-center gap-1.5">
                 <span class="text-fg-muted">{{ origPos(entry, "b") }}</span>
-                <code class="text-green-600 dark:text-green-400 truncate">{{
-                  originalDiffSnippet(entry, "b")
-                }}</code>
+                <code class="text-green-600 dark:text-green-400 truncate">
+                  <PointSnippetView :snippet="originalDiffSnippet(entry, 'b')" tone="green" />
+                </code>
               </div>
             </template>
             <template v-else>
@@ -710,25 +772,27 @@ function statusTextClass(status: DiffEntry["status"]): string {
             <template v-if="isGeneratedChanged(entry)">
               <div class="flex items-center gap-1.5 min-w-0">
                 <span class="text-red-500 font-semibold w-4 shrink-0">A:</span>
-                <code class="text-red-500 truncate">{{ generatedDiffSnippet(entry, "a") }}</code>
+                <code class="text-red-500 truncate">
+                  <PointSnippetView :snippet="generatedDiffSnippet(entry, 'a')" tone="red" />
+                </code>
               </div>
               <div class="flex items-center gap-1.5 min-w-0">
                 <span class="text-green-600 dark:text-green-400 font-semibold w-4 shrink-0"
                   >B:</span
                 >
-                <code class="text-green-600 dark:text-green-400 truncate">{{
-                  generatedDiffSnippet(entry, "b")
-                }}</code>
+                <code class="text-green-600 dark:text-green-400 truncate">
+                  <PointSnippetView :snippet="generatedDiffSnippet(entry, 'b')" tone="green" />
+                </code>
               </div>
             </template>
             <template v-else-if="entry.status === 'removed'">
               <code class="text-red-500 truncate block">
-                {{ generatedDiffSnippet(entry, "a") }}
+                <PointSnippetView :snippet="generatedDiffSnippet(entry, 'a')" tone="red" />
               </code>
             </template>
             <template v-else-if="entry.status === 'added'">
               <code class="text-green-600 dark:text-green-400 truncate block">
-                {{ generatedDiffSnippet(entry, "b") }}
+                <PointSnippetView :snippet="generatedDiffSnippet(entry, 'b')" tone="green" />
               </code>
             </template>
             <template v-else>

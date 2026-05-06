@@ -7,3 +7,6 @@ dist
 .superpowers
 docs/superpowers
 packages/cli/void.json
+
+# Local agent state — not for commit
+.claude/
