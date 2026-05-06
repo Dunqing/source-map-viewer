@@ -1,9 +1,7 @@
-import { decodeSourceMapDataUrl, extractInlineSourceMap } from "./parser";
+import { EXTERNAL_SOURCE_MAP_RE, decodeSourceMapDataUrl, extractInlineSourceMap } from "./parser";
 import type { RawSourceMap } from "./types";
 
 const SOURCE_MAP_EXTENSIONS = new Set([".map", ".json"]);
-const EXTERNAL_SOURCE_MAP_RE =
-  /(?:\/\/[#@]\s*sourceMappingURL=|\/\*[#@]\s*sourceMappingURL=)\s*(\S+)\s*\*?\/?\s*$/m;
 
 export interface FileCollectionEntry {
   path: string;

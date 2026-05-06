@@ -53,8 +53,10 @@ export function parseSourceMap(jsonString: string): SourceMapData {
   };
 }
 
-const INLINE_SOURCE_MAP_RE =
+export const INLINE_SOURCE_MAP_RE =
   /(?:\/\/[#@]\s*sourceMappingURL=|\/\*[#@]\s*sourceMappingURL=)(data:[^\s*]+)\s*\*?\/?\s*$/m;
+export const EXTERNAL_SOURCE_MAP_RE =
+  /(?:\/\/[#@]\s*sourceMappingURL=|\/\*[#@]\s*sourceMappingURL=)\s*(\S+)\s*\*?\/?\s*$/m;
 const SOURCE_MAP_COMMENT_RE =
   /(?:\/\/[#@]\s*sourceMappingURL=|\/\*[#@]\s*sourceMappingURL=).*?(?:\*\/)?[\r\n]*$/m;
 
