@@ -263,17 +263,15 @@ function dedupeEntries(entries: FileCollectionEntry[]): ParsedEntry[] {
     if (!path) continue;
 
     const sourceMapJson = parseSourceMapObject(entry.content) ? entry.content : null;
+    const inlineMatch = extractInlineSourceMap(entry.content);
     byPath.set(path, {
       path,
       content: entry.content,
       ext: getExtension(path),
       sourceMapJson,
       rawSourceMap: sourceMapJson ? parseSourceMapObject(sourceMapJson) : null,
-      inline: extractInlineSourceMap(entry.content)
-        ? {
-            generatedCode: extractInlineSourceMap(entry.content)!.code,
-            sourceMapJson: extractInlineSourceMap(entry.content)!.sourceMapJson,
-          }
+      inline: inlineMatch
+        ? { generatedCode: inlineMatch.code, sourceMapJson: inlineMatch.sourceMapJson }
         : null,
     });
   }
