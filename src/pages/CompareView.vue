@@ -36,6 +36,8 @@ const diffResult = computed(() =>
   diffMappings(compareIndexA.value, compareIndexB.value, {
     sourcesA: parsedA.value.sources,
     sourcesB: parsedB.value.sources,
+    namesA: parsedA.value.names,
+    namesB: parsedB.value.names,
   }),
 );
 
@@ -133,6 +135,8 @@ function compareCountLabel(visibleCount: number, rawCount: number): string {
         :summary="diffResult.summary"
         :sources-a="parsedA.sources"
         :sources-b="parsedB.sources"
+        :names-a="parsedA.names"
+        :names-b="parsedB.names"
         :gen-lines-a="genLinesA"
         :gen-lines-b="genLinesB"
         :orig-lines-a="origLinesA"

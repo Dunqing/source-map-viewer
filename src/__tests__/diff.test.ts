@@ -139,6 +139,37 @@ describe("diffMappings", () => {
     expect(added!.b).toEqual(seg(1, 0, 3, 0));
   });
 
+  it("flags name-only differences as changed when names arrays are provided", () => {
+    // Same generated and original positions, but the resolved name token differs.
+    const a = [{ ...seg(0, 0, 1, 0), nameIndex: 0 }];
+    const b = [{ ...seg(0, 0, 1, 0), nameIndex: 0 }];
+    const result = diffMappings(a, b, { namesA: ["foo"], namesB: ["bar"] });
+
+    expect(result.summary).toEqual({
+      same: 0,
+      changed: 1,
+      removed: 0,
+      added: 0,
+    });
+  });
+
+  it("treats name-equivalent mappings as same even when nameIndex differs (different names arrays)", () => {
+    // Same name string but at different indices in the two names arrays.
+    const a = [{ ...seg(0, 0, 1, 0), nameIndex: 0 }];
+    const b = [{ ...seg(0, 0, 1, 0), nameIndex: 1 }];
+    const result = diffMappings(a, b, {
+      namesA: ["foo", "bar"],
+      namesB: ["bar", "foo"],
+    });
+
+    expect(result.summary).toEqual({
+      same: 1,
+      changed: 0,
+      removed: 0,
+      added: 0,
+    });
+  });
+
   it("handles empty inputs", () => {
     expect(diffMappings([], []).summary).toEqual({
       same: 0,

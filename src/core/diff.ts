@@ -23,6 +23,8 @@ export interface DiffResult {
 export interface DiffOptions {
   sourcesA?: string[];
   sourcesB?: string[];
+  namesA?: string[];
+  namesB?: string[];
 }
 
 function sameSource(
@@ -47,12 +49,17 @@ function sourceId(seg: MappingSegment, sources?: string[]): string {
   return source ? normalizeSourceName(source) : `#${seg.sourceIndex}`;
 }
 
+function nameId(seg: MappingSegment, names?: string[]): string {
+  if (seg.nameIndex == null) return "";
+  return names?.[seg.nameIndex] ?? `#${seg.nameIndex}`;
+}
+
 function makeOriginalKey(seg: MappingSegment, sources?: string[]): string {
   return `${sourceId(seg, sources)}:${seg.originalLine}:${seg.originalColumn}`;
 }
 
-function makeExactKey(seg: MappingSegment, sources?: string[]): string {
-  return `${makeGeneratedKey(seg)}|${makeOriginalKey(seg, sources)}`;
+function makeExactKey(seg: MappingSegment, sources?: string[], names?: string[]): string {
+  return `${makeGeneratedKey(seg)}|${makeOriginalKey(seg, sources)}|${nameId(seg, names)}`;
 }
 
 function buildQueueMap(
@@ -92,12 +99,15 @@ export function findExactMappingInSameSource(
   targetSources: string[] | undefined,
   candidates: MappingSegment[],
   candidateSources: string[] | undefined,
+  targetNames?: string[],
+  candidateNames?: string[],
 ): MappingSegment | null {
   return (
     candidates.find(
       (candidate) =>
         sameSource(target, targetSources, candidate, candidateSources) &&
-        makeExactKey(candidate, candidateSources) === makeExactKey(target, targetSources),
+        makeExactKey(candidate, candidateSources, candidateNames) ===
+          makeExactKey(target, targetSources, targetNames),
     ) ?? null
   );
 }
@@ -139,8 +149,8 @@ export function diffMappings(
   b: MappingSegment[],
   options: DiffOptions = {},
 ): DiffResult {
-  const { sourcesA, sourcesB } = options;
-  const bByExact = buildQueueMap(b, (seg) => makeExactKey(seg, sourcesB));
+  const { sourcesA, sourcesB, namesA, namesB } = options;
+  const bByExact = buildQueueMap(b, (seg) => makeExactKey(seg, sourcesB, namesB));
   const bByGenerated = buildQueueMap(b, makeGeneratedKey);
   const bByOriginal = buildQueueMap(b, (seg) => makeOriginalKey(seg, sourcesB));
 
@@ -151,7 +161,7 @@ export function diffMappings(
 
   // First, match exact mappings: same generated and same original/source location.
   a.forEach((aSeg, index) => {
-    const bIndex = popNextUnmatched(bByExact, makeExactKey(aSeg, sourcesA), usedB);
+    const bIndex = popNextUnmatched(bByExact, makeExactKey(aSeg, sourcesA, namesA), usedB);
     if (bIndex == null) return;
 
     usedA.add(index);

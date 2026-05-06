@@ -97,6 +97,8 @@ function formatDiffMarkdown(
   const { entries, summary } = diffMappings(compareIndexA, compareIndexB, {
     sourcesA: parsedA.sources,
     sourcesB: parsedB.sources,
+    namesA: parsedA.names,
+    namesB: parsedB.names,
   });
 
   const origLinesA = parsedA.sourcesContent.map((c) => (c ?? "").split("\n"));

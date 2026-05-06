@@ -14,6 +14,8 @@ const props = defineProps<{
   summary: DiffSummary;
   sourcesA: string[];
   sourcesB: string[];
+  namesA?: string[];
+  namesB?: string[];
   genLinesA: string[];
   genLinesB: string[];
   origLinesA: string[][];
@@ -199,6 +201,10 @@ function sourcesForSide(side: "a" | "b"): string[] {
   return side === "a" ? props.sourcesA : props.sourcesB;
 }
 
+function namesForSide(side: "a" | "b"): string[] | undefined {
+  return side === "a" ? props.namesA : props.namesB;
+}
+
 function buildPreviewSideData(entry: DiffEntry, side: "a" | "b"): PreviewSideData {
   const current = entry[side];
   if (current) {
@@ -222,6 +228,8 @@ function buildPreviewSideData(entry: DiffEntry, side: "a" | "b"): PreviewSideDat
     sourcesForSide(otherSide),
     rawMappingsForSide(side),
     sourcesForSide(side),
+    namesForSide(otherSide),
+    namesForSide(side),
   );
   const nearestRaw =
     exactRaw ??
