@@ -1,4 +1,4 @@
-import { clampOriginalPosition, skipLeadingWhitespace } from "./mapper";
+import { clampDisplayColumn, clampOriginalPosition, skipLeadingWhitespace } from "./mapper";
 
 export interface SnippetOptions {
   length?: number;
@@ -7,10 +7,6 @@ export interface SnippetOptions {
 
 interface ExtractSnippetOptions extends SnippetOptions {
   skipIndent?: boolean;
-}
-
-function clampSnippetColumn(lineText: string, column: number): number {
-  return Math.max(0, Math.min(lineText.length, column));
 }
 
 function formatSnippet(
@@ -31,7 +27,9 @@ export function extractSnippet(
   { length = 40, appendEllipsis = false, skipIndent = false }: ExtractSnippetOptions = {},
 ): string {
   const text = lines[line] ?? "";
-  const start = skipIndent ? skipLeadingWhitespace(text, col) : clampSnippetColumn(text, col);
+  const start = skipIndent
+    ? skipLeadingWhitespace(text, col)
+    : clampDisplayColumn(col, text.length);
   return formatSnippet(text, start, { length, appendEllipsis });
 }
 

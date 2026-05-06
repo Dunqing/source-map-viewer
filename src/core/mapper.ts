@@ -29,7 +29,7 @@ export function clampOriginalPosition(
   return { line, column };
 }
 
-function clampDisplayColumn(column: number, lineLength: number): number {
+export function clampDisplayColumn(column: number, lineLength: number): number {
   return Math.max(0, Math.min(lineLength, column));
 }
 
