@@ -119,6 +119,32 @@ function formatVisibleWhitespace(text: string): string {
   return text.replace(/\t/g, "⇥").replace(/ /g, "·");
 }
 
+function htmlEscape(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Render a (possibly whitespace-substituted) string as HTML, wrapping
+ * `⇥` and `·` markers in styled spans so they render dimmer than the
+ * surrounding code and tabs visually take ~2 columns of indent. The
+ * caller-provided text is HTML-escaped first; the only HTML in the
+ * output is the injected wrapper spans.
+ *
+ * Used via `v-html` in the diff-row preview panes. Orig-side text never
+ * contains markers (the substitution only runs on gen lines), so for
+ * those calls this just acts as a safe HTML escape.
+ */
+function renderPreviewText(text: string): string {
+  return htmlEscape(text)
+    .replaceAll("⇥", '<span class="ws-tab">⇥</span>')
+    .replaceAll("·", '<span class="ws-space">·</span>');
+}
+
 function clampColumn(lineText: string, column: number): number {
   return Math.max(0, Math.min(lineText.length, column));
 }
@@ -421,10 +447,10 @@ function contextLineText(
   type: "gen" | "orig",
   line: { text: string; isTarget: boolean },
 ): string {
-  // Render explicit whitespace markers (`→` for tabs, `·` for spaces) on
+  // Render explicit whitespace markers (`⇥` for tabs, `·` for spaces) on
   // every gen-side line in the snippet preview, not just the target.
   // The previous targeted-only behavior made context indentation
-  // inconsistent with the target line (target showed tabs as `→`, context
+  // inconsistent with the target line (target showed tabs as `⇥`, context
   // lines rendered them at the browser's default tab-stop width), making
   // codegen output look like its indentation was missing on context lines.
   if (type === "gen" && entry[side] && entry.status !== "same") {
@@ -884,8 +910,8 @@ function statusTextClass(status: DiffEntry["status"]): string {
                   ><span
                       :class="previewLineClass(entry, mappedSide(entry), line)"
                     ><span class="inline-block w-8 text-right pr-2 text-fg-muted select-none">{{ line.lineNum }}</span><template v-if="previewPointParts(entry, mappedSide(entry), 'gen', line)"
-                      ><span>{{ previewPointParts(entry, mappedSide(entry), "gen", line)!.before }}</span><span :class="previewPointClass(entry, mappedSide(entry))">{{ previewPointParts(entry, mappedSide(entry), "gen", line)!.point }}</span><span>{{ previewPointParts(entry, mappedSide(entry), "gen", line)!.after }}</span></template
-                    ><template v-else>{{ contextLineText(entry, mappedSide(entry), "gen", line) }}</template>
+                      ><span v-html="renderPreviewText(previewPointParts(entry, mappedSide(entry), 'gen', line)!.before)"></span><span :class="previewPointClass(entry, mappedSide(entry))">{{ previewPointParts(entry, mappedSide(entry), "gen", line)!.point }}</span><span v-html="renderPreviewText(previewPointParts(entry, mappedSide(entry), 'gen', line)!.after)"></span></template
+                    ><template v-else><span v-html="renderPreviewText(contextLineText(entry, mappedSide(entry), 'gen', line))"></span></template>
 </span><span
                       v-if="previewMarkerText(entry, mappedSide(entry), 'gen', line)"
                       class="block"
@@ -945,8 +971,8 @@ function statusTextClass(status: DiffEntry["status"]): string {
                   ><span
                       :class="previewLineClass(entry, missingSide(entry), line)"
                     ><span class="inline-block w-8 text-right pr-2 text-fg-muted select-none">{{ line.lineNum }}</span><template v-if="previewPointParts(entry, missingSide(entry), 'gen', line)"
-                      ><span>{{ previewPointParts(entry, missingSide(entry), "gen", line)!.before }}</span><span :class="previewPointClass(entry, missingSide(entry))">{{ previewPointParts(entry, missingSide(entry), "gen", line)!.point }}</span><span>{{ previewPointParts(entry, missingSide(entry), "gen", line)!.after }}</span></template
-                    ><template v-else>{{ contextLineText(entry, missingSide(entry), "gen", line) }}</template>
+                      ><span v-html="renderPreviewText(previewPointParts(entry, missingSide(entry), 'gen', line)!.before)"></span><span :class="previewPointClass(entry, missingSide(entry))">{{ previewPointParts(entry, missingSide(entry), "gen", line)!.point }}</span><span v-html="renderPreviewText(previewPointParts(entry, missingSide(entry), 'gen', line)!.after)"></span></template
+                    ><template v-else><span v-html="renderPreviewText(contextLineText(entry, missingSide(entry), 'gen', line))"></span></template>
 </span><span
                       v-if="previewMarkerText(entry, missingSide(entry), 'gen', line)"
                       class="block"
@@ -1001,8 +1027,8 @@ function statusTextClass(status: DiffEntry["status"]): string {
                   ><span
                       :class="previewLineClass(entry, 'a', line)"
                     ><span class="inline-block w-8 text-right pr-2 text-fg-muted select-none">{{ line.lineNum }}</span><template v-if="previewPointParts(entry, 'a', 'gen', line)"
-                      ><span>{{ previewPointParts(entry, "a", "gen", line)!.before }}</span><span :class="previewPointClass(entry, 'a')">{{ previewPointParts(entry, "a", "gen", line)!.point }}</span><span>{{ previewPointParts(entry, "a", "gen", line)!.after }}</span></template
-                    ><template v-else>{{ contextLineText(entry, "a", "gen", line) }}</template>
+                      ><span v-html="renderPreviewText(previewPointParts(entry, 'a', 'gen', line)!.before)"></span><span :class="previewPointClass(entry, 'a')">{{ previewPointParts(entry, "a", "gen", line)!.point }}</span><span v-html="renderPreviewText(previewPointParts(entry, 'a', 'gen', line)!.after)"></span></template
+                    ><template v-else><span v-html="renderPreviewText(contextLineText(entry, 'a', 'gen', line))"></span></template>
 </span><span
                       v-if="previewMarkerText(entry, 'a', 'gen', line)"
                       class="block"
@@ -1053,8 +1079,8 @@ function statusTextClass(status: DiffEntry["status"]): string {
                   ><span
                       :class="previewLineClass(entry, 'b', line)"
                     ><span class="inline-block w-8 text-right pr-2 text-fg-muted select-none">{{ line.lineNum }}</span><template v-if="previewPointParts(entry, 'b', 'gen', line)"
-                      ><span>{{ previewPointParts(entry, "b", "gen", line)!.before }}</span><span :class="previewPointClass(entry, 'b')">{{ previewPointParts(entry, "b", "gen", line)!.point }}</span><span>{{ previewPointParts(entry, "b", "gen", line)!.after }}</span></template
-                    ><template v-else>{{ contextLineText(entry, "b", "gen", line) }}</template>
+                      ><span v-html="renderPreviewText(previewPointParts(entry, 'b', 'gen', line)!.before)"></span><span :class="previewPointClass(entry, 'b')">{{ previewPointParts(entry, "b", "gen", line)!.point }}</span><span v-html="renderPreviewText(previewPointParts(entry, 'b', 'gen', line)!.after)"></span></template
+                    ><template v-else><span v-html="renderPreviewText(contextLineText(entry, 'b', 'gen', line))"></span></template>
 </span><span
                       v-if="previewMarkerText(entry, 'b', 'gen', line)"
                       class="block"
@@ -1068,3 +1094,20 @@ function statusTextClass(status: DiffEntry["status"]): string {
     </div>
   </div>
 </template>
+
+<style>
+/* Non-scoped so the rules reach the spans injected by `v-html` in the
+   preview panes (scoped styles can't tag runtime-inserted DOM). The
+   class names are namespaced enough that bleed into other components
+   isn't a concern. */
+.ws-tab,
+.ws-space {
+  color: var(--c-text-3);
+  opacity: 0.55;
+}
+.ws-tab {
+  display: inline-block;
+  min-width: 2ch;
+  text-align: left;
+}
+</style>
