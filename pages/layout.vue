@@ -93,7 +93,7 @@ html.has-share-slug #app {
   --seg-5: #cce4e6;
   --seg-6: #dbd4e8;
   --seg-hover: rgba(0, 0, 0, 0.1);
-  --seg-hover-ring: rgba(0, 0, 0, 0.45);
+  --seg-hover-ring: rgba(0, 0, 0, 0.35);
   --connector-stroke: rgba(0, 0, 0, 0.4);
   --connector-curve: rgba(0, 0, 0, 0.3);
   --connector-clamped: #ef4444;
@@ -118,7 +118,7 @@ html.dark {
   --seg-5: #304e4e;
   --seg-6: #443654;
   --seg-hover: rgba(255, 255, 255, 0.14);
-  --seg-hover-ring: rgba(255, 255, 255, 0.55);
+  --seg-hover-ring: rgba(255, 255, 255, 0.45);
   --connector-stroke: rgba(255, 255, 255, 0.5);
   --connector-curve: rgba(255, 255, 255, 0.4);
   --connector-clamped: #f87171;

@@ -301,14 +301,13 @@ function getLineSpans(visibleIdx: number): RenderSpan[] {
 function getSpanStyle(span: RenderSpan): Record<string, string> | undefined {
   if (!span.segment) return undefined;
   if (isSegmentHovered(span.segment)) {
-    // Background tint + inset ring. The ring is what makes the hover state
-    // findable across panes — on the compare page, the cross-pane echo
-    // applies the same `:hovered` styling on the other side, and a flat
-    // background tint alone reads as "maybe just a slightly different
-    // segment color" until the ring confirms it.
+    // A segment often spans multiple Shiki tokens, each rendered as its own
+    // <span>. A 4-sided ring on each one would produce internal vertical
+    // boundaries between adjacent tokens of the same segment. Use a bottom
+    // underline instead — adjacent spans join into one continuous line.
     return {
       backgroundColor: "var(--seg-hover)",
-      boxShadow: "inset 0 0 0 1px var(--seg-hover-ring)",
+      boxShadow: "inset 0 -2px 0 var(--seg-hover-ring)",
     };
   }
   if (span.colorIndex === null) return undefined;
