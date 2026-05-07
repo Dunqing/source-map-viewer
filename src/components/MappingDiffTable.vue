@@ -421,7 +421,13 @@ function contextLineText(
   type: "gen" | "orig",
   line: { text: string; isTarget: boolean },
 ): string {
-  if (type === "gen" && line.isTarget && entry[side] && entry.status !== "same") {
+  // Render explicit whitespace markers (`→` for tabs, `·` for spaces) on
+  // every gen-side line in the snippet preview, not just the target.
+  // The previous targeted-only behavior made context indentation
+  // inconsistent with the target line (target showed tabs as `→`, context
+  // lines rendered them at the browser's default tab-stop width), making
+  // codegen output look like its indentation was missing on context lines.
+  if (type === "gen" && entry[side] && entry.status !== "same") {
     return formatVisibleWhitespace(line.text);
   }
   return line.text;
