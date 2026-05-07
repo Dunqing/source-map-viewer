@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { replaceCurrentPath } from "../composables/navigation";
 import IconArrowLeft from "~icons/carbon/arrow-left";
 import IconLogoGithub from "~icons/carbon/logo-github";
 import IconSun from "~icons/carbon/sun";
@@ -43,23 +44,48 @@ const props = defineProps<{
   slugB?: string;
 }>();
 
-const ignoreSourceName = ref(false);
 const selectedPatternKey = ref<string | null>(null);
 
-// Persist the active tab across reloads. The compare page is the only
-// place that reads/writes this key, and the set of valid values is
-// closed (`table` | `code`), so a localStorage round-trip is enough —
-// no migration, no schema. SSR-safe via the `typeof window` guard.
-const ACTIVE_TAB_KEY = "compare:activeTab";
-function loadActiveTab(): CompareTab {
-  if (typeof window === "undefined") return "table";
-  const v = window.localStorage.getItem(ACTIVE_TAB_KEY);
-  return v === "code" || v === "table" ? v : "table";
+// Tab choice and the "ignore source filename" toggle persist via query
+// params so that compare URLs are shareable with the same view a user is
+// looking at. `ignoreSourceName` defaults to `true` because comparing two
+// builds of the same project usually only differs in source paths
+// (`./src/...` vs `src/...`, absolute vs relative), and matching by name
+// would mark the entire diff as renamed noise. Default values are omitted
+// from the URL so the common case stays clean.
+const TAB_PARAM = "tab";
+const IGNORE_NAME_PARAM = "ignore-source-name";
+
+interface CompareUrlState {
+  tab: CompareTab;
+  ignoreSourceName: boolean;
 }
-const activeTab = ref<CompareTab>(loadActiveTab());
-watch(activeTab, (next) => {
+
+function readCompareUrlState(): CompareUrlState {
+  if (typeof window === "undefined") return { tab: "table", ignoreSourceName: true };
+  const params = new URLSearchParams(window.location.search);
+  const tabRaw = params.get(TAB_PARAM);
+  const tab: CompareTab = tabRaw === "code" || tabRaw === "table" ? tabRaw : "table";
+  const ignoreSourceName = params.get(IGNORE_NAME_PARAM) !== "0";
+  return { tab, ignoreSourceName };
+}
+
+const initialUrlState = readCompareUrlState();
+const ignoreSourceName = ref(initialUrlState.ignoreSourceName);
+const activeTab = ref<CompareTab>(initialUrlState.tab);
+
+// `watch` is lazy by default — it only fires on changes after setup, so
+// the initial assignment from URL doesn't stomp params, and nothing else
+// here mutates these refs during mount.
+watch([activeTab, ignoreSourceName], () => {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(ACTIVE_TAB_KEY, next);
+  const params = new URLSearchParams(window.location.search);
+  if (activeTab.value === "code") params.set(TAB_PARAM, "code");
+  else params.delete(TAB_PARAM);
+  if (!ignoreSourceName.value) params.set(IGNORE_NAME_PARAM, "0");
+  else params.delete(IGNORE_NAME_PARAM);
+  const search = params.toString();
+  replaceCurrentPath(`${window.location.pathname}${search ? `?${search}` : ""}`);
 });
 
 const parsedA = computed(() => parseSourceMap(props.entryA.sourceMapJson));
