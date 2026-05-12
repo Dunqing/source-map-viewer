@@ -129,7 +129,7 @@ export default defineConfig({
     },
   },
   test: {
-    environment: "happy-dom",
+    environment: "native-dom",
   },
   plugins: [
     unocssDevSSRInject(),
