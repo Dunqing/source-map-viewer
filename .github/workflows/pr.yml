@@ -15,13 +15,7 @@ jobs:
         with:
           cache: true
           run-install: false
-      - uses: actions/setup-node@v4
-        with:
-          registry-url: https://npm.pkg.github.com
-          scope: "@void-sdk"
       - run: vp install
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       - run: vp check
       - run: vp test --run
       # Build + smoke-test the CLI so a broken `bin.js` is caught at PR time.

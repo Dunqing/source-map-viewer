@@ -21,10 +21,7 @@ vp install                      # Install dependencies
 
 ## Setup
 
-Requires GitHub Packages auth for `@void-sdk` private packages:
-
-- `.npmrc` maps `@void-sdk:registry=https://npm.pkg.github.com`
-- `~/.npmrc` must have a GitHub PAT with `read:packages` scope: `//npm.pkg.github.com/:_authToken=YOUR_TOKEN`
+Dependencies are public packages. Run `vp install` after pulling changes.
 
 ## Architecture
 
@@ -61,7 +58,7 @@ Input → Parse → Index → Validate → Store → Visualize
 
 ### Rendering Stack
 
-- **Void SDK** (`@void-sdk/void` + `@void-sdk/vue`) — SSR framework on Cloudflare Workers. `pages/layout.vue` = root layout (CSS custom properties, UnoCSS imports). `pages/index.vue` = entry point (path-based routing between landing/viz). Config in `void.json` with `"output": "server"`. Server routes in `routes/`, middleware in `middleware/`.
+- **Void SDK** (`void` + `@void/vue`) — SSR framework on Cloudflare Workers. `pages/layout.vue` = root layout (CSS custom properties, UnoCSS imports). `pages/index.vue` = entry point (path-based routing between landing/viz). Config in `void.json` with `"output": "server"`. Server routes in `routes/`, middleware in `middleware/`.
 - **Shiki** — Uses `shiki/core` with explicit lang/theme imports (JS, TS, CSS, JSON + github-light/dark) and `createJavaScriptRegexEngine`. Never import from bare `shiki` — it bundles 200+ languages.
 - **UnoCSS** — Utility CSS with semantic color aliases (`bg-panel`, `text-fg`, `border-edge`, etc.) mapped to CSS custom properties in `uno.config.ts`. Dark mode via `html.dark` class toggling CSS variable values in `pages/layout.vue`.
 - **unplugin-icons** — Carbon icons via `~icons/carbon/*` imports.
