@@ -6,19 +6,13 @@ settings:
 
 catalogs:
   default:
-    vite:
-      specifier: npm:@voidzero-dev/vite-plus-core@^0.1.23
-      version: 0.1.23
     vite-plus:
       specifier: ^0.1.23
       version: 0.1.23
-    vitest:
-      specifier: npm:@voidzero-dev/vite-plus-test@^0.1.23
-      version: 0.1.23
 
 overrides:
-  vite: npm:@voidzero-dev/vite-plus-core@^0.1.19
-  vitest: npm:@voidzero-dev/vite-plus-test@^0.1.19
+  vite: npm:@voidzero-dev/vite-plus-core@^0.1.23
+  vitest: npm:@voidzero-dev/vite-plus-test@^0.1.23
 
 importers:
 
@@ -71,13 +65,13 @@ importers:
         specifier: ^23.0.1
         version: 23.0.1(@vue/compiler-sfc@3.5.35)
       vite:
-        specifier: 'catalog:'
+        specifier: npm:@voidzero-dev/vite-plus-core@^0.1.23
         version: '@voidzero-dev/vite-plus-core@0.1.23(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)'
       vite-plus:
         specifier: 'catalog:'
         version: 0.1.23(@types/node@25.9.1)(@voidzero-dev/vite-plus-core@0.1.23(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)
       vitest:
-        specifier: 'catalog:'
+        specifier: npm:@voidzero-dev/vite-plus-test@^0.1.23
         version: '@voidzero-dev/vite-plus-test@0.1.23(@types/node@25.9.1)(@voidzero-dev/vite-plus-core@0.1.23(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)'
       vitest-environment-native-dom:
         specifier: 0.0.10
