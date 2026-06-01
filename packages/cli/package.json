@@ -25,6 +25,6 @@
     "source-map-js": "^1.2.1"
   },
   "devDependencies": {
-    "@types/node": "^25.6.0"
+    "@types/node": "^25.9.1"
   }
 }
