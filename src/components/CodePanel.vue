@@ -164,6 +164,9 @@ interface RenderSpan {
   whitespaceKind: WhitespaceKind | null;
 }
 
+const SEGMENT_HOVER_HIT_SLOP_X = 4;
+const SEGMENT_HOVER_HIT_SLOP_Y = 2;
+
 const searchMatchLines = computed(() => {
   const set = new Set<number>();
   const q = props.searchQuery;
@@ -316,6 +319,67 @@ function getSpanStyle(span: RenderSpan): Record<string, string> | undefined {
 
 function handleSegmentHover(segment: MappingSegment | null) {
   store.setHoveredSegment(segment);
+}
+
+function distanceOutsideRect(
+  clientX: number,
+  clientY: number,
+  rect: DOMRect,
+): { dx: number; dy: number } {
+  const dx = clientX < rect.left ? rect.left - clientX : Math.max(0, clientX - rect.right);
+  const dy = clientY < rect.top ? rect.top - clientY : Math.max(0, clientY - rect.bottom);
+  return { dx, dy };
+}
+
+function handleLineMouseMove(visibleIdx: number, event: MouseEvent) {
+  const lineEl = event.currentTarget as HTMLElement | null;
+  if (!lineEl) return;
+
+  const spans = getLineSpans(visibleIdx);
+  const directSpanEl =
+    event.target instanceof HTMLElement
+      ? event.target.closest<HTMLElement>("[data-code-span]")
+      : null;
+  if (directSpanEl && lineEl.contains(directSpanEl)) {
+    const directIndex = Number(directSpanEl.dataset.spanIndex);
+    const directSegment = Number.isInteger(directIndex)
+      ? (spans[directIndex]?.segment ?? null)
+      : null;
+    if (directSegment) {
+      if (store.hoveredSegment !== directSegment) {
+        handleSegmentHover(directSegment);
+      }
+      return;
+    }
+  }
+
+  const spanEls = lineEl.querySelectorAll<HTMLElement>("[data-code-span][data-mapped]");
+  let bestSegment: MappingSegment | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const spanEl of spanEls) {
+    const spanIndex = Number(spanEl.dataset.spanIndex);
+    if (!Number.isInteger(spanIndex)) continue;
+    const segment = spans[spanIndex]?.segment;
+    if (!segment) continue;
+
+    const { dx, dy } = distanceOutsideRect(
+      event.clientX,
+      event.clientY,
+      spanEl.getBoundingClientRect(),
+    );
+    if (dx > SEGMENT_HOVER_HIT_SLOP_X || dy > SEGMENT_HOVER_HIT_SLOP_Y) continue;
+
+    const distance = dx * dx + dy * dy;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestSegment = segment;
+    }
+  }
+
+  if (store.hoveredSegment !== bestSegment) {
+    handleSegmentHover(bestSegment);
+  }
 }
 
 function handleMouseLeave() {
@@ -497,6 +561,7 @@ defineExpose({
             class="flex items-center"
             :style="{ height: `${LINE_HEIGHT}px`, lineHeight: `${LINE_HEIGHT}px` }"
             :class="[searchMatchLines.has(startLine + i) ? 'search-match-line' : '']"
+            @mousemove="handleLineMouseMove(i, $event)"
           >
             <!-- Optional gutter marker for diff-status (used by compare page) -->
             <span
@@ -522,6 +587,9 @@ defineExpose({
               <span
                 v-for="(span, j) in getLineSpans(i)"
                 :key="j"
+                data-code-span
+                :data-span-index="j"
+                :data-mapped="span.segment !== null || undefined"
                 :style="{
                   color: span.textColor,
                   ...getSpanStyle(span),
