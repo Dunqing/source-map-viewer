@@ -9,6 +9,7 @@ import {
   getRenderedColumnRange,
 } from "../core/mapper";
 import type { MappingSegment } from "../core/types";
+import { parseSourceMap } from "../core/parser";
 
 const segments: MappingSegment[] = [
   {
@@ -70,6 +71,24 @@ describe("findMappingForGenerated", () => {
     const result = findMappingForGenerated(index, 0, 3);
     expect(result).not.toBeNull();
     expect(result!.generatedColumn).toBe(0);
+  });
+
+  it("returns null inside explicit gaps and resumes at the next mapped segment", () => {
+    const data = parseSourceMap(
+      JSON.stringify({
+        version: 3,
+        sources: ["input.js"],
+        names: [],
+        mappings: "AAAA,K,KAAA,G",
+      }),
+    );
+    const gapIndex = buildMappingIndex(data.mappings);
+    expect(findMappingForGenerated(gapIndex, 0, 4)).toBe(gapIndex[0]);
+    expect(findMappingForGenerated(gapIndex, 0, 5)).toBeNull();
+    expect(findMappingForGenerated(gapIndex, 0, 9)).toBeNull();
+    expect(findMappingForGenerated(gapIndex, 0, 10)).toBe(gapIndex[1]);
+    expect(findMappingForGenerated(gapIndex, 0, 12)).toBe(gapIndex[1]);
+    expect(findMappingForGenerated(gapIndex, 0, 13)).toBeNull();
   });
 
   it("returns null for position on unmapped line", () => {
@@ -170,6 +189,23 @@ describe("clampOriginalPosition", () => {
 });
 
 describe("getRenderedColumnRange", () => {
+  it("stops at explicit unmapped boundaries before the next mapping or line end", () => {
+    expect(getRenderedColumnRange([0, 10], 0, "abcdefghijklmno", { endColumn: 5 })).toEqual({
+      start: 0,
+      end: 5,
+    });
+    expect(getRenderedColumnRange([0, 10], 1, "abcdefghijklmno", { endColumn: 13 })).toEqual({
+      start: 10,
+      end: 13,
+    });
+    // Trimming indentation must not extend a mapping past its explicit end.
+    expect(getRenderedColumnRange([0], 0, "     code", { skipIndent: true, endColumn: 3 })).toEqual(
+      {
+        start: 5,
+        end: 5,
+      },
+    );
+  });
   it("skips collapsed boundaries after indentation is trimmed", () => {
     const lineText = "                        return original.call(this, value);";
     const columns = [0, 10, 19, 24, 30, 36];

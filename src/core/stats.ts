@@ -50,7 +50,9 @@ function calculateMappedBytes(sortedMappings: MappingSegment[], lines: string[])
       endColumn = line.length;
     }
 
-    mappedBytes += Math.max(0, endColumn - current.generatedColumn);
+    endColumn = Math.min(endColumn, current.generatedEndColumn ?? line.length, line.length);
+    const startColumn = Math.max(0, current.generatedColumn);
+    mappedBytes += Math.max(0, endColumn - startColumn);
   }
 
   return mappedBytes;

@@ -44,7 +44,7 @@ export function getRenderedColumnRange(
   columns: readonly number[],
   index: number,
   lineText: string,
-  { skipIndent = false }: { skipIndent?: boolean } = {},
+  { skipIndent = false, endColumn }: { skipIndent?: boolean; endColumn?: number } = {},
 ): RenderedColumnRange {
   const normalize = skipIndent
     ? (column: number) => skipLeadingWhitespace(lineText, column)
@@ -52,14 +52,19 @@ export function getRenderedColumnRange(
 
   const start = normalize(columns[index] ?? 0);
 
+  let end = lineText.length;
   for (let i = index + 1; i < columns.length; i++) {
     const next = normalize(columns[i] ?? 0);
     if (next > start) {
-      return { start, end: next };
+      end = next;
+      break;
     }
   }
 
-  return { start, end: lineText.length };
+  if (endColumn !== undefined) {
+    end = Math.min(end, clampDisplayColumn(endColumn, lineText.length));
+  }
+  return { start, end: Math.max(start, end) };
 }
 
 export function buildMappingIndex(segments: MappingSegment[]): MappingIndex {
@@ -106,6 +111,7 @@ export function buildVisibleGeneratedMappingIndex(
       const seg = mappingsOnLine[i];
       const { start: startCol, end: endCol } = getRenderedColumnRange(columns, i, lineText, {
         skipIndent: true,
+        endColumn: seg.generatedEndColumn,
       });
       for (let c = startCol; c < endCol && c < lineText.length; c++) {
         charOwner[c] = seg;
@@ -189,6 +195,9 @@ export function findMappingForGenerated(
     }
   }
 
+  if (result?.generatedEndColumn !== undefined && column >= result.generatedEndColumn) {
+    return null;
+  }
   return result;
 }
 

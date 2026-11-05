@@ -121,6 +121,40 @@ describe("decodeSourceMapDataUrl", () => {
     );
   });
 
+  it("decodes UTF-8 filenames, source content, and names from inline maps", () => {
+    const sourceMap = JSON.stringify({
+      version: 3,
+      sources: ["中文.ts"],
+      sourcesContent: ['const 问候 = "你好 🌍";'],
+      names: ["问候"],
+      mappings: "AAAAA",
+    });
+    const bytes = new TextEncoder().encode(sourceMap);
+    const base64 = btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(""));
+    const dataUrl = `data:application/json;charset=utf-8;base64,${base64}`;
+
+    expect(decodeSourceMapDataUrl(dataUrl)).toBe(sourceMap);
+    const inline = extractInlineSourceMap(`output();\n${JS_SOURCE_MAP_DIRECTIVE}${dataUrl}`);
+    expect(inline?.sourceMapJson).toBe(sourceMap);
+    expect(parseSourceMap(inline!.sourceMapJson)).toMatchObject({
+      sources: ["中文.ts"],
+      sourcesContent: ['const 问候 = "你好 🌍";'],
+      names: ["问候"],
+    });
+  });
+
+  it("decodes percent-encoded JSON without treating it as binary", () => {
+    const sourceMap = JSON.stringify({ version: 3, sources: ["中文.ts"], mappings: "" });
+    expect(decodeSourceMapDataUrl(`data:application/json,${encodeURIComponent(sourceMap)}`)).toBe(
+      sourceMap,
+    );
+  });
+
+  it("returns null for malformed base64 and invalid UTF-8", () => {
+    expect(decodeSourceMapDataUrl("data:application/json;base64,!")).toBeNull();
+    expect(decodeSourceMapDataUrl("data:application/json;base64,/w==")).toBeNull();
+  });
+
   it("returns null for non-JSON data URLs", () => {
     expect(decodeSourceMapDataUrl("data:text/plain;base64,SGVsbG8=")).toBeNull();
   });

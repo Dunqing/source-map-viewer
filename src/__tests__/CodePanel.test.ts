@@ -49,6 +49,37 @@ describe("CodePanel", () => {
     ]);
   });
 
+  it("leaves explicit unmapped gaps and trailing code without a mapping highlight", async () => {
+    await getSharedHighlighter({ langs: ["javascript"], themes: ["github-light"] });
+    const store = useSourceMapStore();
+    store.loadSourceMap(
+      "abcdefghijklmno",
+      JSON.stringify({
+        version: 3,
+        sources: ["input.js"],
+        sourcesContent: ["abcdefghijklmno"],
+        names: [],
+        mappings: "AAAA,K,KAAA,G",
+      }),
+    );
+    const wrapper = mount(CodePanel, {
+      props: { code: store.generatedCode, filename: "example.js", side: "generated" },
+    });
+    await nextTick();
+
+    expect(wrapper.findAll("[data-code-span]").map((node) => node.element.textContent)).toEqual([
+      "abcde",
+      "fghij",
+      "klm",
+      "no",
+    ]);
+    expect(wrapper.findAll(".unmapped-generated").map((node) => node.element.textContent)).toEqual([
+      "fghij",
+      "no",
+    ]);
+    wrapper.unmount();
+  });
+
   it("keeps single-character mappings hoverable near their rendered span", async () => {
     await getSharedHighlighter({ langs: ["javascript"], themes: ["github-light"] });
     const store = useSourceMapStore();

@@ -121,6 +121,8 @@ export function findTokenSplitSegments(
           currentIndex !== undefined &&
           current.generatedLine === previous.generatedLine &&
           current.generatedColumn !== previous.generatedColumn &&
+          (previous.generatedEndColumn === undefined ||
+            previous.generatedEndColumn >= current.generatedColumn) &&
           currentIndex === previousIndex + 1
         );
       }),
@@ -133,6 +135,12 @@ export function findTokenSplitSegments(
     (segment) => segment.generatedColumn,
     (_segment, line) => generatedLines[line],
     result,
+    (previousGroup, currentGroup) =>
+      previousGroup.some(
+        (previous) =>
+          previous.generatedEndColumn === undefined ||
+          previous.generatedEndColumn >= currentGroup[0].generatedColumn,
+      ),
   );
 
   for (const [sourceIndex, segments] of inverseMappingIndex) {

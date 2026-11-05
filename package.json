@@ -13,6 +13,7 @@
     "prepare": "vp config"
   },
   "dependencies": {
+    "@jridgewell/trace-mapping": "^0.3.31",
     "@shikijs/markdown-it": "^4.1.0",
     "@shikijs/transformers": "^4.1.0",
     "markdown-it": "^14.2.0",
@@ -22,7 +23,6 @@
   },
   "devDependencies": {
     "@iconify-json/carbon": "^1.2.22",
-    "@jridgewell/trace-mapping": "^0.3.31",
     "@types/markdown-it": "^14.1.2",
     "@unocss/reset": "^66.7.0",
     "@vitejs/plugin-vue": "^6.0.7",

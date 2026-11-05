@@ -236,6 +236,38 @@ describe("validateMappings", () => {
 });
 
 describe("findTokenSplitSegments", () => {
+  it("does not infer token splits between mappings separated by an explicit gap", () => {
+    const data = makeSourceMap({
+      sourcesContent: ["ab"],
+      mappings: [
+        {
+          generatedLine: 0,
+          generatedColumn: 0,
+          generatedEndColumn: 5,
+          originalLine: 0,
+          originalColumn: 0,
+          sourceIndex: 0,
+          nameIndex: null,
+        },
+        {
+          generatedLine: 0,
+          generatedColumn: 10,
+          originalLine: 0,
+          originalColumn: 1,
+          sourceIndex: 0,
+          nameIndex: null,
+        },
+      ],
+    });
+    expect(
+      findTokenSplitSegments(
+        data,
+        "abcdefghijklmno",
+        buildMappingIndex(data.mappings),
+        buildInverseMappingIndex(data.mappings),
+      ).size,
+    ).toBe(0);
+  });
   it("flags boundaries that split an identifier on the generated side", () => {
     const first = {
       generatedLine: 0,

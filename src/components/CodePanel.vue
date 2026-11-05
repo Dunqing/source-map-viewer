@@ -237,6 +237,7 @@ const visibleLineSpans = computed<RenderSpan[][]>(() => {
       const seg = mappingsOnLine[i];
       const { start: startCol, end: endCol } = getRenderedColumnRange(mappingColumns, i, lineText, {
         skipIndent: props.side === "generated",
+        endColumn: props.side === "generated" ? seg.generatedEndColumn : undefined,
       });
 
       for (let c = startCol; c < endCol && c < lineText.length; c++) {

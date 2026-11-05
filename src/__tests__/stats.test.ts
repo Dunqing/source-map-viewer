@@ -3,6 +3,38 @@ import { calculateStats } from "../core/stats";
 import { buildMappingIndex } from "../core/mapper";
 import { validateMappings } from "../core/validator";
 import type { MappingDiagnostic, SourceMapData } from "../core/types";
+import { parseSourceMap } from "../core/parser";
+import { parseSourceMapLite } from "../core/parser-lite";
+
+describe.each([
+  ["browser", parseSourceMap],
+  ["server", parseSourceMapLite],
+] as const)("%s parser coverage", (_name, parse) => {
+  it.each([
+    ["middle gap", "AAAA,K,KAAA", "abcdefghijklmno", 10, 5, 67],
+    ["trailing gap", "AAAA,K", "abcdefghijklmno", 5, 10, 33],
+    ["leading gap", "A,KAAA", "abcdefghijklmno", 10, 5, 67],
+    ["duplicate mappings", "AAAA,AAAA,K,KAAA", "abcdefghijklmno", 10, 5, 67],
+    ["consecutive unmapped boundaries", "AAAA,K,E,EAAA", "abcdefghijklmno", 11, 4, 73],
+    ["next line resets the gap", "AAAA,K;AAAA", "abcdefghijklmno\nabcdefghijklmno", 20, 10, 67],
+    ["columns beyond code are clamped", "AAAA,oBAAA", "abcdefghijklmno", 15, 0, 100],
+  ])("respects %s", (_label, mappings, code, mapped, unmapped, percent) => {
+    const data = parse(
+      JSON.stringify({
+        version: 3,
+        sources: ["input.js"],
+        sourcesContent: [code],
+        names: [],
+        mappings,
+      }),
+    );
+    expect(calculateStats(data, code, [], buildMappingIndex(data.mappings))).toMatchObject({
+      mappedBytes: mapped,
+      unmappedBytes: unmapped,
+      coveragePercent: percent,
+    });
+  });
+});
 
 describe("calculateStats", () => {
   it("calculates basic stats", () => {

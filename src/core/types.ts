@@ -11,6 +11,8 @@ export interface SourceMapData {
 export interface MappingSegment {
   generatedLine: number;
   generatedColumn: number;
+  /** Exclusive end at an explicit unmapped boundary on the same generated line. */
+  generatedEndColumn?: number;
   originalLine: number;
   originalColumn: number;
   sourceIndex: number;

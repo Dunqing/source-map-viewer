@@ -37,6 +37,7 @@ function getDisplayRange(
   index: number,
   lineText: string,
   fallbackColumn: number,
+  endColumn?: number,
 ): RenderedColumnRange {
   return getRenderedColumnRange(
     index >= 0 ? columns : [fallbackColumn],
@@ -44,6 +45,7 @@ function getDisplayRange(
     lineText,
     {
       skipIndent: true,
+      endColumn,
     },
   );
 }
@@ -88,7 +90,13 @@ function getSegmentDisplayColumns(
 
   const result = {
     orig: getDisplayRange(originalColumns, originalIndex, origLineText, clamped.column),
-    gen: getDisplayRange(generatedColumns, generatedIndex, genLineText, seg.generatedColumn),
+    gen: getDisplayRange(
+      generatedColumns,
+      generatedIndex,
+      genLineText,
+      seg.generatedColumn,
+      seg.generatedEndColumn,
+    ),
   };
 
   displayColCache.set(seg, result);

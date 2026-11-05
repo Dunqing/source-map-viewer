@@ -1,137 +1,116 @@
 /**
- * Lightweight source map parser that doesn't use `source-map-js`.
- * Works in restricted environments like Cloudflare Workers where
- * `new Function()` is forbidden.
+ * Source map parser for restricted environments like Cloudflare Workers,
+ * where source-map-js's use of `new Function()` is forbidden.
  */
+import {
+  decodedMappings,
+  TraceMap,
+  type EncodedSourceMap,
+  type SectionedSourceMap,
+} from "@jridgewell/trace-mapping";
 import type { MappingSegment, SourceMapData } from "./types";
 
-const VLQ_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-const VLQ_LOOKUP = new Uint8Array(128).fill(255);
-for (let i = 0; i < VLQ_CHARS.length; i++) {
-  VLQ_LOOKUP[VLQ_CHARS.charCodeAt(i)] = i;
-}
+type RawMap = EncodedSourceMap | SectionedSourceMap;
+type GeneratedPosition = { generatedLine: number; generatedColumn: number };
 
-function decodeVlq(encoded: string, index: number): [value: number, nextIndex: number] {
-  let shift = 0;
-  let result = 0;
-  let i = index;
-
-  while (i < encoded.length) {
-    const digit = VLQ_LOOKUP[encoded.charCodeAt(i)];
-    if (digit === 255) throw new Error(`Invalid VLQ character: ${encoded[i]}`);
-    i++;
-
-    const hasContinuation = digit & 32;
-    result += (digit & 31) << shift;
-    shift += 5;
-
-    if (!hasContinuation) {
-      const isNegative = result & 1;
-      const value = result >> 1;
-      return [isNegative ? -value : value, i];
-    }
-  }
-
-  throw new Error("Unterminated VLQ sequence");
-}
-
-function decodeMappings(mappingsStr: string): MappingSegment[] {
-  const segments: MappingSegment[] = [];
-  if (!mappingsStr) return segments;
-
-  let generatedLine = 0;
-  let generatedColumn = 0;
-  let sourceIndex = 0;
-  let originalLine = 0;
-  let originalColumn = 0;
-  let nameIndex = 0;
-
-  const lines = mappingsStr.split(";");
-
-  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    generatedLine = lineIdx;
-    generatedColumn = 0;
-
-    const line = lines[lineIdx];
-    if (!line) continue;
-
-    const segs = line.split(",");
-
-    for (const seg of segs) {
-      if (!seg) continue;
-
-      let i = 0;
-      let value: number;
-
-      // Field 1: generatedColumn (relative)
-      [value, i] = decodeVlq(seg, i);
-      generatedColumn += value;
-
-      if (i >= seg.length) {
-        // 1-field segment: unmapped generated position
-        continue;
-      }
-
-      // Field 2: sourceIndex (relative)
-      [value, i] = decodeVlq(seg, i);
-      sourceIndex += value;
-
-      // Field 3: originalLine (relative)
-      [value, i] = decodeVlq(seg, i);
-      originalLine += value;
-
-      // Field 4: originalColumn (relative)
-      [value, i] = decodeVlq(seg, i);
-      originalColumn += value;
-
-      let segNameIndex: number | null = null;
-      if (i < seg.length) {
-        // Field 5: nameIndex (relative)
-        [value, i] = decodeVlq(seg, i);
-        nameIndex += value;
-        segNameIndex = nameIndex;
-      }
-
-      segments.push({
-        generatedLine,
-        generatedColumn,
-        originalLine,
-        originalColumn,
-        sourceIndex,
-        nameIndex: segNameIndex,
-      });
-    }
-  }
-
-  return segments;
+function comparePositions(a: GeneratedPosition, b: GeneratedPosition): number {
+  return a.generatedLine - b.generatedLine || a.generatedColumn - b.generatedColumn;
 }
 
 export function parseSourceMapLite(jsonString: string): SourceMapData {
-  const raw = JSON.parse(jsonString);
+  const raw: RawMap = JSON.parse(jsonString);
+  const sources: string[] = [];
+  const sourcesContent: (string | null)[] = [];
+  const names: string[] = [];
+  const positions: (MappingSegment | GeneratedPosition)[] = [];
 
-  if (raw.version !== 3 && !raw.sections) {
-    throw new Error(`Unsupported source map version: ${raw.version}`);
+  function appendMap(
+    input: RawMap,
+    generatedLine = 0,
+    generatedColumn = 0,
+    end?: GeneratedPosition,
+  ): void {
+    if (input.version !== 3) {
+      throw new Error(`Unsupported source map version: ${String(input.version)}`);
+    }
+
+    if ("sections" in input) {
+      const sectionPosition = (offset: { line: number; column: number }): GeneratedPosition => ({
+        generatedLine: generatedLine + offset.line,
+        // A parent column offset affects only its first generated line.
+        generatedColumn: offset.column + (offset.line === 0 ? generatedColumn : 0),
+      });
+
+      for (let i = 0; i < input.sections.length; i++) {
+        const section = input.sections[i];
+        if (!section.map) throw new Error("Source map sections must contain an embedded map");
+        const start = sectionPosition(section.offset);
+        const nextSection = input.sections[i + 1];
+        const next = nextSection ? sectionPosition(nextSection.offset) : undefined;
+        const sectionEnd = next && (!end || comparePositions(next, end) < 0) ? next : end;
+        appendMap(section.map as RawMap, start.generatedLine, start.generatedColumn, sectionEnd);
+      }
+      return;
+    }
+
+    const map = new TraceMap(input);
+    const sourceOffset = sources.length;
+    const nameOffset = names.length;
+    for (let i = 0; i < map.resolvedSources.length; i++) {
+      sources.push(map.resolvedSources[i]);
+      sourcesContent.push(map.sourcesContent?.[i] ?? null);
+    }
+    for (const name of map.names) names.push(name);
+
+    const decoded = decodedMappings(map);
+    for (let line = 0; line < decoded.length; line++) {
+      for (const segment of decoded[line]) {
+        const position = {
+          generatedLine: generatedLine + line,
+          generatedColumn: segment[0] + (line === 0 ? generatedColumn : 0),
+        };
+        // Later sections own their generated range, including nested sections.
+        if (end && comparePositions(position, end) >= 0) return;
+        if (segment.length === 1) {
+          positions.push(position);
+        } else {
+          positions.push({
+            ...position,
+            sourceIndex: sourceOffset + segment[1],
+            originalLine: segment[2],
+            originalColumn: segment[3],
+            nameIndex: segment.length === 5 ? nameOffset + segment[4] : null,
+          });
+        }
+      }
+    }
   }
 
-  // Handle sectioned source maps by only taking the first section
-  const map = raw.sections ? (raw.sections[0]?.map ?? raw) : raw;
+  appendMap(raw);
+  // Stable sorting retains every occurrence and its order at duplicate positions.
+  positions.sort(comparePositions);
+  const mappings: MappingSegment[] = [];
+  let preceding: MappingSegment[] = [];
+  for (const position of positions) {
+    const previous = preceding[0];
+    if (previous && previous.generatedLine !== position.generatedLine) preceding = [];
 
-  const sources: string[] = map.sources ?? [];
-  const sourcesContent: (string | null)[] = (map.sourcesContent ?? []).map(
-    (c: string | null | undefined) => c ?? null,
-  );
-  // Pad sourcesContent to match sources length
-  while (sourcesContent.length < sources.length) {
-    sourcesContent.push(null);
+    if ("sourceIndex" in position) {
+      if (!previous || comparePositions(previous, position) !== 0) preceding = [];
+      preceding.push(position);
+      mappings.push(position);
+    } else {
+      // Only explicit unmapped segments add an end. Apply it to all duplicates
+      // at the preceding mapped position, so none can extend across the gap.
+      for (const mapping of preceding) mapping.generatedEndColumn = position.generatedColumn;
+      preceding = [];
+    }
   }
-
-  const names: string[] = map.names ?? [];
-  const mappings = decodeMappings(map.mappings ?? "");
 
   return {
     version: 3,
-    file: map.file,
-    sourceRoot: map.sourceRoot,
+    file: raw.file ?? undefined,
+    sourceRoot: "sourceRoot" in raw ? raw.sourceRoot : undefined,
     sources,
     sourcesContent,
     names,

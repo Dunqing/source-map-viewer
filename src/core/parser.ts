@@ -1,5 +1,6 @@
 import { SourceMapConsumer, type RawSourceMap as SMRawSourceMap } from "source-map-js";
 import type { MappingSegment, SourceMapData } from "./types";
+import { parseSourceMapLite } from "./parser-lite";
 
 export function parseSourceMap(jsonString: string): SourceMapData {
   const raw = JSON.parse(jsonString);
@@ -7,6 +8,10 @@ export function parseSourceMap(jsonString: string): SourceMapData {
   if (raw.version !== 3 && !raw.sections) {
     throw new Error(`Unsupported source map version: ${raw.version}`);
   }
+
+  // Use the Worker-safe indexed parser in both runtimes so section offsets,
+  // source tables, and names resolve identically in the viewer and reports.
+  if (raw.sections) return parseSourceMapLite(jsonString);
 
   const consumer = new SourceMapConsumer(raw as SMRawSourceMap);
 
@@ -23,8 +28,22 @@ export function parseSourceMap(jsonString: string): SourceMapData {
   const mappings: MappingSegment[] = [];
 
   consumer.eachMapping((mapping) => {
-    if (mapping.source == null || mapping.originalLine == null || mapping.originalColumn == null)
+    if (mapping.source == null || mapping.originalLine == null || mapping.originalColumn == null) {
+      // Keep the stop boundary without treating it as a source mapping. Include
+      // duplicate positions so none of their inferred ranges crosses the gap.
+      const last = mappings[mappings.length - 1];
+      for (let i = mappings.length - 1; i >= 0; i--) {
+        const previous = mappings[i];
+        if (
+          previous.generatedLine !== mapping.generatedLine - 1 ||
+          previous.generatedColumn !== last.generatedColumn ||
+          previous.generatedEndColumn !== undefined
+        )
+          break;
+        previous.generatedEndColumn = mapping.generatedColumn;
+      }
       return;
+    }
 
     const sourceIndex = sourceIndexMap.get(mapping.source) ?? -1;
     if (sourceIndex === -1) return;
@@ -80,7 +99,9 @@ export function decodeSourceMapDataUrl(input: string): string | null {
 
   try {
     const decodedPayload = decodeURIComponent(payload);
-    return isBase64 ? atob(decodedPayload.replace(/\s+/g, "")) : decodedPayload;
+    if (!isBase64) return decodedPayload;
+    const bytes = Uint8Array.from(atob(decodedPayload.replace(/\s+/g, "")), (c) => c.charCodeAt(0));
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
     return null;
   }
