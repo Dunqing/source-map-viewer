@@ -1,10 +1,11 @@
-name: Deploy
+# Deployments are handled by the Void GitHub App's managed builds.
+name: Build
 on:
   push:
     branches: [main]
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,6 +14,7 @@ jobs:
           cache: true
           run-install: false
       - run: vp install
+      - run: vp exec void prepare
       - run: vp check
       - run: vp test --run
       # Build + smoke-test the CLI so a broken `bin.js` is caught here
@@ -20,6 +22,3 @@ jobs:
       - run: vp run --filter source-map-viewer build
       - run: node packages/cli/bin.js --help > /dev/null
       - run: vp build
-      - run: vp exec void deploy --project source-map-viewer --skip-build
-        env:
-          VOID_TOKEN: ${{ secrets.VOID_TOKEN }}

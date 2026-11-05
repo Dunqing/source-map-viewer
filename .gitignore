@@ -10,3 +10,5 @@ packages/cli/void.json
 
 # Local agent state — not for commit
 .claude/
+.void-wrangler.jsonc
+.cloudflare

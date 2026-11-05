@@ -115,6 +115,23 @@ function unocssDevSSRInject(): Plugin {
   };
 }
 
+// Cloudflare v2 finalizes environment output directories in configResolved.
+// UnoCSS's scan plugin runs early by default, so defer just its resolved-config
+// hook until those directories are final. Keep its source transforms early.
+function unoCssAfterCloudflare(): Plugin[] {
+  return UnoCSS().map((plugin) => {
+    if (plugin.name !== "unocss:global:build:scan" || !plugin.configResolved) return plugin;
+    const hook = plugin.configResolved;
+    return {
+      ...plugin,
+      configResolved: {
+        order: "post",
+        handler: typeof hook === "function" ? hook : hook.handler,
+      },
+    };
+  });
+}
+
 export default defineConfig({
   staged: {
     "*": "vp check --fix",
@@ -134,7 +151,7 @@ export default defineConfig({
   plugins: [
     unocssDevSSRInject(),
     ...(isTest ? [vue()] : [voidPlugin(), voidVue()]),
-    UnoCSS(),
+    unoCssAfterCloudflare(),
     Icons({ compiler: "vue3", autoInstall: true }),
   ],
   resolve: {

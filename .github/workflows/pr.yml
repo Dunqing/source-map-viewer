@@ -16,6 +16,7 @@ jobs:
           cache: true
           run-install: false
       - run: vp install
+      - run: vp exec void prepare
       - run: vp check
       - run: vp test --run
       # Build + smoke-test the CLI so a broken `bin.js` is caught at PR time.

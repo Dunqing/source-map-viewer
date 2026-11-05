@@ -96,13 +96,50 @@ vp dlx source-map-viewer dist/bundle.js --ai | pbcopy
 
 ## Development
 
+Requires Node.js `^24.22.0` or `>=26.12.0` for Void 1.6.
+
 ```bash
 vp install
+vp exec void prepare
 vp dev
 vp build
 vp check
 vp test --run
 ```
+
+Void configuration lives in `void.config.ts`. Run `vp exec void prepare` after a fresh install to generate the local `.void/` types before checking the project.
+
+## Deployment
+
+The app uses the existing `source-map-viewer` project at `https://api.void.cloud`. To set up automatic deployment from `Dunqing/source-map-viewer` on `main`, connect locally and install the Void GitHub App:
+
+```bash
+vp exec void connect https://api.void.cloud
+```
+
+```bash
+vp exec void github install
+```
+
+In GitHub, select the `Dunqing` account and grant the App access to `source-map-viewer`. Then connect the repository to the existing project using Void's managed build executor:
+
+```bash
+vp exec void github connect source-map-viewer --repo Dunqing/source-map-viewer --branch main --executor container
+```
+
+```bash
+vp exec void github status source-map-viewer
+```
+
+Once connected, pushes to `main` trigger managed builds and deployments in Void. `.github/workflows/deploy.yml` runs build checks only, so GitHub Actions does not also deploy. Managed builds do not need a repository `VOID_TOKEN` secret or `VOID_API_URL` variable.
+
+For a manual deployment from your local checkout:
+
+```bash
+vp exec void deploy --platform void --project source-map-viewer
+```
+
+Deployment builds the app unless `--skip-build` is passed. When resource IDs are recorded in `void.lock.json`, commit that file so future deployments reuse them. Local configuration changes take effect for managed builds after they are pushed to `main`.
 
 ## Resources
 
