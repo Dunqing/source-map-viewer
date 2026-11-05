@@ -329,7 +329,7 @@ function paneLabel(
         title="Back to home"
       >
         <IconArrowLeft class="w-4 h-4 text-fg-muted" />
-        <img src="/logo.svg" alt="Logo" class="h-5 w-5" />
+        <img :src="'/logo.svg'" alt="Logo" class="h-5 w-5" />
         <span class="text-sm font-semibold text-fg">{{ APP_NAME }}</span>
       </a>
       <span class="text-xs text-fg-muted ml-1">Compare</span>

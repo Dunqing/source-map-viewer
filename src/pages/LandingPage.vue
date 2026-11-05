@@ -281,7 +281,7 @@ function formatTimeAgo(timestamp: number): string {
         <!-- Header -->
         <div class="mx-auto max-w-2xl text-center">
           <div class="flex items-center justify-center gap-2 mb-1">
-            <img src="/logo.svg" alt="Logo" class="h-8 w-8" />
+            <img :src="'/logo.svg'" alt="Logo" class="h-8 w-8" />
             <h1 class="text-4xl font-bold tracking-tight text-fg">
               {{ APP_NAME }}
             </h1>

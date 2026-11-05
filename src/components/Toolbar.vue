@@ -41,7 +41,7 @@ const emit = defineEmits<{
       title="Back to home"
       @click="emit('home')"
     >
-      <img src="/logo.svg" alt="Logo" class="h-5 w-5" />
+      <img :src="'/logo.svg'" alt="Logo" class="h-5 w-5" />
       <span class="text-sm font-semibold text-fg">{{ APP_NAME }}</span>
     </a>
     <div class="flex-1" />
