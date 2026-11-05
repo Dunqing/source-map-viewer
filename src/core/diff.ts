@@ -58,6 +58,18 @@ function makeGeneratedKey(seg: MappingSegment): string {
   return `${seg.generatedLine}:${seg.generatedColumn}`;
 }
 
+/** Group duplicate positions for inspection, retaining every target occurrence. */
+export function findDuplicateGeneratedPositions(mappings: MappingSegment[]): MappingSegment[][] {
+  const groups = new Map<string, MappingSegment[]>();
+  for (const mapping of mappings) {
+    const key = makeGeneratedKey(mapping);
+    const group = groups.get(key);
+    if (group) group.push(mapping);
+    else groups.set(key, [mapping]);
+  }
+  return [...groups.values()].filter((group) => group.length > 1);
+}
+
 export function normalizeSourceName(source: string): string {
   return source.replace(/\\/g, "/").replace(/^(\.\/)+/, "");
 }
@@ -394,6 +406,11 @@ function classify(cost: number, hasShiftSignature: boolean): DiffStatus {
   return "changed";
 }
 
+/**
+ * Compare raw mapping occurrences. Matching uses array indices (not a map keyed
+ * by generated position), so equal positions and identical tuples each consume
+ * one counterpart. Rendering visibility must not filter either input.
+ */
 export function diffMappings(
   a: MappingSegment[],
   b: MappingSegment[],

@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@iconify-json/carbon": "^1.2.22",
+    "@jridgewell/trace-mapping": "^0.3.31",
     "@types/markdown-it": "^14.1.2",
     "@unocss/reset": "^66.7.0",
     "@vitejs/plugin-vue": "^6.0.7",

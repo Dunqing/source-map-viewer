@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, shallowRef, watch } from "vue";
 import {
   findExactMappingInSameSource,
   findNearestMappingInSameSource,
@@ -33,7 +33,9 @@ const props = defineProps<{
 }>();
 
 const showSame = ref(false);
-const expandedIndex = ref<string | null>(null);
+// Entry identity distinguishes otherwise identical duplicate occurrences.
+const expandedEntry = shallowRef<DiffEntry | null>(null);
+const entryIds = computed(() => new Map(props.entries.map((entry, index) => [entry, index])));
 
 const CONTEXT_LINES = 3;
 const EMPTY_PREVIEW_SIDE_DATA = {
@@ -63,24 +65,8 @@ const filteredEntries = computed(() => {
   return entries;
 });
 
-function segmentKey(seg: MappingSegment | null): string {
-  if (!seg) return "none";
-  return [
-    seg.generatedLine,
-    seg.generatedColumn,
-    seg.originalLine,
-    seg.originalColumn,
-    seg.sourceIndex,
-    seg.nameIndex ?? "null",
-  ].join(":");
-}
-
-function entryKey(entry: DiffEntry): string {
-  return `${entry.status}:${segmentKey(entry.a)}:${segmentKey(entry.b)}`;
-}
-
-function toggleExpand(key: string) {
-  expandedIndex.value = expandedIndex.value === key ? null : key;
+function toggleExpand(entry: DiffEntry) {
+  expandedEntry.value = expandedEntry.value === entry ? null : entry;
 }
 
 function statusIcon(status: DiffEntry["status"]): string {
@@ -559,7 +545,7 @@ function disappearedMissingSummary(entry: DiffEntry): string {
   }
 
   if (exactRaw) {
-    return `${sideTitle(missingSide(entry))} still has the same raw mapping at ${exactRaw.originalLine + 1}:${exactRaw.originalColumn} → ${exactRaw.generatedLine + 1}:${exactRaw.generatedColumn}, but compare hides it because another mapping owns that visible generated span.`;
+    return `${sideTitle(missingSide(entry))} has fewer occurrences of this raw mapping at ${exactRaw.originalLine + 1}:${exactRaw.originalColumn} → ${exactRaw.generatedLine + 1}:${exactRaw.generatedColumn}. Its matching occurrences are already paired; this extra occurrence exists only in ${sideTitle(mappedSide(entry))}.`;
   }
 
   const sameOriginalLine = mapped.originalLine === nearest.originalLine;
@@ -677,15 +663,12 @@ function statusTextClass(status: DiffEntry["status"]): string {
 
     <!-- Diff cards -->
     <div class="space-y-1">
-      <div v-for="(entry, i) in filteredEntries" :key="i">
+      <div v-for="entry in filteredEntries" :key="entryIds.get(entry)">
         <!-- Entry row -->
         <div
           class="flex items-start gap-2 px-3 py-1.5 rounded-lg border border-edge text-xs font-mono cursor-pointer"
-          :class="[
-            statusClass(entry.status),
-            expandedIndex === entryKey(entry) ? 'rounded-b-none' : '',
-          ]"
-          @click="toggleExpand(entryKey(entry))"
+          :class="[statusClass(entry.status), expandedEntry === entry ? 'rounded-b-none' : '']"
+          @click="toggleExpand(entry)"
         >
           <!-- Status -->
           <div class="mt-0.5 shrink-0 flex items-center gap-1.5">
@@ -836,19 +819,19 @@ function statusTextClass(status: DiffEntry["status"]): string {
 
           <!-- Expand indicator -->
           <span class="text-fg-muted shrink-0 mt-0.5">{{
-            expandedIndex === entryKey(entry) ? "▾" : "▸"
+            expandedEntry === entry ? "▾" : "▸"
           }}</span>
         </div>
 
         <!-- Expanded code preview -->
         <div
-          v-if="expandedIndex === entryKey(entry)"
+          v-if="expandedEntry === entry"
           class="border border-t-0 border-edge rounded-b-lg bg-panel overflow-hidden"
         >
           <template v-if="isDisappearedEntry(entry)">
             <div class="border-b border-edge bg-muted/40 px-3 py-2">
               <div class="text-sm font-semibold text-fg">
-                This mapping exists in {{ sideTitle(mappedSide(entry)) }} but not in
+                This mapping occurrence exists in {{ sideTitle(mappedSide(entry)) }} but not in
                 {{ sideTitle(missingSide(entry)) }}.
               </div>
               <div class="mt-0.5 text-xs text-fg-muted">

@@ -69,6 +69,11 @@ export function buildMappingIndex(segments: MappingSegment[]): MappingIndex {
   });
 }
 
+/**
+ * Character ownership for rendering only: later overlapping mappings win.
+ * Never use this filtered index for semantic comparisons, which must retain
+ * every mapping occurrence, including duplicate generated positions.
+ */
 export function buildVisibleGeneratedMappingIndex(
   index: MappingIndex,
   generatedLines: string[],

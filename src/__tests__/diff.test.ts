@@ -3,7 +3,19 @@ import {
   diffMappings,
   findExactMappingInSameSource,
   findNearestMappingInSameSource,
+  findDuplicateGeneratedPositions,
 } from "../core/diff";
+import { parseSourceMap } from "../core/parser";
+import { buildMappingIndex, buildVisibleGeneratedMappingIndex } from "../core/mapper";
+import { SourceMapConsumer, type RawSourceMap } from "source-map-js";
+import { TraceMap, originalPositionFor } from "@jridgewell/trace-mapping";
+import {
+  generatedCode,
+  reproEntryA,
+  reproEntryB,
+  reproMapA,
+  reproMapB,
+} from "./fixtures/duplicateMappings";
 import type { MappingSegment } from "../core/types";
 
 function seg(
@@ -24,6 +36,129 @@ function seg(
 }
 
 const EMPTY_SUMMARY = { same: 0, shifted: 0, changed: 0, removed: 0, added: 0 };
+
+describe("duplicate generated positions", () => {
+  it("exposes the removed public mapping in the exact serialized repro", () => {
+    const a = buildMappingIndex(parseSourceMap(reproEntryA.sourceMapJson).mappings);
+    const b = buildMappingIndex(parseSourceMap(reproEntryB.sourceMapJson).mappings);
+    expect(a).toEqual([
+      seg(0, 0, 0, 0),
+      seg(0, 6, 0, 6),
+      seg(0, 8, 0, 8),
+      seg(1, 1, 1, 2),
+      seg(1, 1, 1, 9),
+      seg(1, 10, 1, 18),
+      seg(1, 11, 1, 19),
+      seg(2, 0, 2, 0),
+    ]);
+    expect(b).toEqual(a.filter((mapping) => mapping !== a[3]));
+
+    const result = diffMappings(a, b, {
+      sourcesA: reproMapA.sources,
+      sourcesB: reproMapB.sources,
+    });
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, same: 7, removed: 1 });
+    expect(result.entries.find((entry) => entry.status === "removed")).toEqual({
+      status: "removed",
+      a: seg(1, 1, 1, 2),
+      b: null,
+    });
+
+    // Character ownership still intentionally hides the earlier duplicate.
+    // This filtered rendering index must never be the input to comparison.
+    const visible = buildVisibleGeneratedMappingIndex(a, generatedCode.split("\n"));
+    expect(visible).toHaveLength(7);
+    expect(visible).not.toContain(a[3]);
+    expect(a).toHaveLength(8);
+  });
+
+  it.each([
+    [
+      "source-map-js",
+      (map: typeof reproMapA) =>
+        // source-map-js incorrectly types the v3 version field as a string.
+        new SourceMapConsumer(map as unknown as RawSourceMap).originalPositionFor({
+          line: 2,
+          column: 1,
+        }),
+    ],
+    [
+      "trace-mapping",
+      (map: typeof reproMapA) => originalPositionFor(new TraceMap(map), { line: 2, column: 1 }),
+    ],
+  ] as const)("changes actual %s lookup from public to verify", (_name, lookup) => {
+    expect(lookup(reproMapA)).toEqual({ source: "input.ts", line: 2, column: 2, name: null });
+    expect(lookup(reproMapB)).toEqual({ source: "input.ts", line: 2, column: 9, name: null });
+  });
+
+  it("preserves identical maps containing duplicate positions and duplicate tuples", () => {
+    const a = [seg(1, 1, 1, 2), seg(1, 1, 1, 9), seg(1, 1, 1, 9)];
+    const b = a.map((mapping) => ({ ...mapping }));
+    const result = diffMappings(a, b);
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, same: 3 });
+    expect(result.entries).toHaveLength(3);
+    expect(new Set(result.entries.map((entry) => entry.b)).size).toBe(3);
+  });
+
+  it("matches duplicate names by resolved name before pairing a name change", () => {
+    const a = [0, 1].map((nameIndex) => ({ ...seg(1, 1, 1, 9), nameIndex }));
+    const b = [0, 1].map((nameIndex) => ({ ...seg(1, 1, 1, 9), nameIndex }));
+    const result = diffMappings(a, b, {
+      namesA: ["public", "verify"],
+      namesB: ["verify", "check"],
+    });
+    expect(result.summary).toEqual({ ...EMPTY_SUMMARY, same: 1, changed: 1 });
+    expect(result.entries.find((entry) => entry.status === "same")).toMatchObject({
+      a: a[1],
+      b: b[0],
+    });
+    expect(result.entries.find((entry) => entry.status === "changed")).toMatchObject({
+      a: a[0],
+      b: b[1],
+    });
+    const removed = diffMappings(a, [b[0]], { namesA: ["public", "verify"], namesB: ["verify"] });
+    expect(removed.summary).toEqual({ ...EMPTY_SUMMARY, same: 1, removed: 1 });
+    expect(removed.entries.find((entry) => entry.status === "removed")?.a).toBe(a[0]);
+  });
+
+  it.each([1, 2, 3])(
+    "retains %i extra identical serialized occurrences as removed or added",
+    (extra) => {
+      const a = parseSourceMap(
+        JSON.stringify({
+          ...reproMapA,
+          mappings: Array(extra + 1)
+            .fill("AAAA")
+            .join(","),
+        }),
+      ).mappings;
+      const b = parseSourceMap(JSON.stringify({ ...reproMapB, mappings: "AAAA" })).mappings;
+      expect(a).toHaveLength(extra + 1);
+      expect(diffMappings(a, b).summary).toEqual({ ...EMPTY_SUMMARY, same: 1, removed: extra });
+      expect(diffMappings(b, a).summary).toEqual({ ...EMPTY_SUMMARY, same: 1, added: extra });
+    },
+  );
+
+  it("normalizes reordered source and name tables without losing duplicates", () => {
+    const a = [0, 1].map((nameIndex) => ({ ...seg(1, 1, 1, 9, 0), nameIndex }));
+    const b = [1, 0].map((nameIndex) => ({ ...seg(1, 1, 1, 9, 1), nameIndex }));
+    expect(
+      diffMappings(a, b, {
+        sourcesA: ["./src/input.ts", "other.ts"],
+        sourcesB: ["other.ts", "src\\input.ts"],
+        namesA: ["public", "verify"],
+        namesB: ["verify", "public"],
+      }).summary,
+    ).toEqual({ ...EMPTY_SUMMARY, same: 2 });
+  });
+
+  it("groups all duplicate targets for inspection without collapsing identical tuples", () => {
+    const repeated = seg(1, 1, 1, 9);
+    const mappings = [seg(0, 1, 0, 0), seg(1, 1, 1, 2), repeated, repeated, seg(1, 2, 1, 10)];
+    expect(findDuplicateGeneratedPositions(mappings)).toEqual([[mappings[1], repeated, repeated]]);
+    expect(findDuplicateGeneratedPositions([mappings[0], mappings[4]])).toEqual([]);
+  });
+});
 
 describe("diffMappings", () => {
   it("reports all same when mappings are identical", () => {

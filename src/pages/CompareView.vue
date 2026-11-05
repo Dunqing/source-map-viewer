@@ -7,9 +7,9 @@ import IconSun from "~icons/carbon/sun";
 import IconMoon from "~icons/carbon/moon";
 import IconScreen from "~icons/carbon/screen";
 import { parseSourceMap } from "../core/parser";
-import { buildMappingIndex, buildVisibleGeneratedMappingIndex } from "../core/mapper";
+import { buildMappingIndex } from "../core/mapper";
 import { validateMappings } from "../core/validator";
-import { diffMappings } from "../core/diff";
+import { diffMappings, findDuplicateGeneratedPositions, normalizeSourceName } from "../core/diff";
 import { detectPatterns } from "../core/patterns";
 import MappingDiffTable from "../components/MappingDiffTable.vue";
 import PatternSummary from "../components/PatternSummary.vue";
@@ -106,18 +106,29 @@ const heavyViewBlocked = computed(
 
 const indexA = computed(() => buildMappingIndex(parsedA.value.mappings));
 const indexB = computed(() => buildMappingIndex(parsedB.value.mappings));
-const compareIndexA = computed(() =>
-  buildVisibleGeneratedMappingIndex(indexA.value, genLinesA.value),
-);
-const compareIndexB = computed(() =>
-  buildVisibleGeneratedMappingIndex(indexB.value, genLinesB.value),
-);
+const duplicateSides = computed(() => [
+  {
+    side: "A",
+    groups: findDuplicateGeneratedPositions(indexA.value),
+    sources: parsedA.value.sources,
+    names: parsedA.value.names,
+  },
+  {
+    side: "B",
+    groups: findDuplicateGeneratedPositions(indexB.value),
+    sources: parsedB.value.sources,
+    names: parsedB.value.names,
+  },
+]);
+const hasDuplicates = computed(() => duplicateSides.value.some(({ groups }) => groups.length > 0));
 
 const diagnosticsA = computed(() => validateMappings(parsedA.value));
 const diagnosticsB = computed(() => validateMappings(parsedB.value));
 
 const diffResult = computed(() =>
-  diffMappings(compareIndexA.value, compareIndexB.value, {
+  // Semantic comparison uses every raw occurrence, independently of which
+  // mapping owns the characters rendered by the code panes.
+  diffMappings(indexA.value, indexB.value, {
     sourcesA: parsedA.value.sources,
     sourcesB: parsedB.value.sources,
     namesA: parsedA.value.names,
@@ -302,12 +313,6 @@ function paneLabel(
   if (slug) return slug.length > 12 ? `${slug.slice(0, 12)}...` : slug;
   return entryLabel;
 }
-
-function compareCountLabel(visibleCount: number, rawCount: number): string {
-  return visibleCount === rawCount
-    ? `${visibleCount} mappings`
-    : `${visibleCount} compared, ${rawCount} raw`;
-}
 </script>
 
 <template>
@@ -344,8 +349,7 @@ function compareCountLabel(visibleCount: number, rawCount: number): string {
         </a>
         <span v-else class="font-mono text-fg truncate">{{ entryA.label }}</span>
         <span class="text-fg-muted shrink-0">
-          {{ compareCountLabel(compareIndexA.length, indexA.length)
-          }}<template v-if="diagnosticsA.length"
+          {{ indexA.length }} raw mappings<template v-if="diagnosticsA.length"
             >,
             <span class="text-amber-600 dark:text-amber-400"
               >{{ diagnosticsA.length }} issues</span
@@ -368,8 +372,7 @@ function compareCountLabel(visibleCount: number, rawCount: number): string {
         </a>
         <span v-else class="font-mono text-fg truncate">{{ entryB.label }}</span>
         <span class="text-fg-muted shrink-0">
-          {{ compareCountLabel(compareIndexB.length, indexB.length)
-          }}<template v-if="diagnosticsB.length"
+          {{ indexB.length }} raw mappings<template v-if="diagnosticsB.length"
             >,
             <span class="text-amber-600 dark:text-amber-400"
               >{{ diagnosticsB.length }} issues</span
@@ -410,6 +413,47 @@ function compareCountLabel(visibleCount: number, rawCount: number): string {
          inside the Diff table panel since pattern selection only filters
          the table — the Code panes view ignored the filter anyway. -->
     <div class="max-w-6xl mx-auto p-4">
+      <details
+        v-if="hasDuplicates"
+        class="mb-3 rounded-lg border border-edge bg-surface px-3 py-2 text-xs text-fg-dim"
+      >
+        <summary class="cursor-pointer font-semibold">
+          Duplicate generated positions
+          <span v-for="side in duplicateSides" :key="side.side" class="ml-2 font-mono">
+            {{ side.side }}: {{ side.groups.length }}
+          </span>
+        </summary>
+        <p class="mt-2 text-fg-muted">
+          Multiple mappings share a generated position. All occurrences are compared; code
+          highlighting may show only one target. Positions use 1-based lines and 0-based columns.
+        </p>
+        <div v-for="side in duplicateSides" :key="side.side">
+          <div
+            v-for="group in side.groups"
+            :key="`${group[0].generatedLine}:${group[0].generatedColumn}`"
+            class="mt-2 font-mono"
+          >
+            <div class="font-semibold">
+              {{ side.side }} · Generated {{ group[0].generatedLine + 1 }}:{{
+                group[0].generatedColumn
+              }}
+              · {{ group.length }} mappings
+            </div>
+            <ol class="list-decimal pl-5 mt-1">
+              <li v-for="(mapping, i) in group" :key="i">
+                {{
+                  normalizeSourceName(
+                    side.sources[mapping.sourceIndex] ?? `#${mapping.sourceIndex}`,
+                  )
+                }}:{{ mapping.originalLine + 1 }}:{{ mapping.originalColumn }}
+                <span v-if="mapping.nameIndex !== null">
+                  · name: {{ side.names[mapping.nameIndex] ?? `#${mapping.nameIndex}` }}
+                </span>
+              </li>
+            </ol>
+          </div>
+        </div>
+      </details>
       <!-- Tab switcher: same button-bar pattern as EntrypointTabs.vue -->
       <div
         class="flex items-center gap-2 px-2 py-1 mb-3 rounded-lg border border-edge bg-muted overflow-x-auto"
