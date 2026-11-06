@@ -36,6 +36,7 @@ const props = defineProps<{
   filename: string;
   side: "original" | "generated";
   searchQuery?: string;
+  focusPosition?: { line: number; column: number } | null;
   /**
    * Optional per-line marker. When set, lines whose 0-based index appears
    * in the map render a colored dot in the line-number gutter. Used by the
@@ -68,6 +69,7 @@ const lines = computed(() => props.code.split("\n"));
 const totalLines = computed(() => lines.value.length);
 
 const {
+  scrollTop: virtualScrollTop,
   startLine,
   endLine,
   offsetY,
@@ -518,7 +520,57 @@ function getCharWidth(): number {
   return cachedCharWidth || FALLBACK_CHAR_WIDTH;
 }
 
+const focusMarkerStyle = ref<Record<string, string> | null>(null);
+
+async function updateFocusMarker() {
+  await nextTick();
+  const focus = props.focusPosition;
+  const container = containerRef.value;
+  positionCache.clear();
+  const position = focus && container ? getViewportPosition(focus.line, focus.column) : null;
+  focusMarkerStyle.value =
+    position && container
+      ? {
+          left: `${position.x - container.getBoundingClientRect().left + container.scrollLeft}px`,
+          top: `${focus!.line * LINE_HEIGHT}px`,
+          height: `${LINE_HEIGHT}px`,
+        }
+      : null;
+}
+
+watch([() => props.focusPosition, visibleLineSpans, containerHeight], updateFocusMarker, {
+  flush: "post",
+});
+onMounted(updateFocusMarker);
+
+async function scrollToPosition(line: number, column: number) {
+  const container = containerRef.value;
+  if (!container || line < 0 || line >= lines.value.length) return;
+  // Update the virtual window immediately so positions on distant lines can
+  // be measured before centering horizontally (including tabs and Unicode).
+  container.scrollTop = Math.max(
+    0,
+    (line - Math.floor(containerHeight.value / LINE_HEIGHT / 2)) * LINE_HEIGHT,
+  );
+  virtualScrollTop.value = container.scrollTop;
+  positionCache.clear();
+  await nextTick();
+  const position = getViewportPosition(line, column);
+  if (position) {
+    container.scrollLeft = Math.max(
+      0,
+      container.scrollLeft +
+        position.x -
+        container.getBoundingClientRect().left -
+        container.clientWidth / 2,
+    );
+  }
+  positionCache.clear();
+  await updateFocusMarker();
+}
+
 defineExpose({
+  scrollToPosition,
   scrollToLine: doScrollToLine,
   scrollToLineIfNeeded,
   getViewportPosition,
@@ -553,6 +605,14 @@ defineExpose({
         <IconCheckmark v-if="copied" class="w-4 h-4 text-green-500" />
         <IconCopy v-else class="w-4 h-4" />
       </button>
+      <div
+        v-if="focusPosition && focusMarkerStyle"
+        data-lookup-position
+        role="img"
+        :aria-label="`Lookup position ${focusPosition.line + 1}:${focusPosition.column}`"
+        class="absolute z-10 pointer-events-none border-l-2 border-blue-500 bg-blue-500/15 w-2"
+        :style="focusMarkerStyle"
+      />
       <div :style="{ height: `${totalHeight}px`, position: 'relative' }">
         <div :style="{ transform: `translateY(${offsetY}px)` }">
           <div

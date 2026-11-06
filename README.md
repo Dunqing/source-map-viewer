@@ -9,6 +9,7 @@ A visual tool for inspecting, comparing, and sharing JavaScript/CSS source maps.
 - **Interactive mapping viewer** — hover or click any mapped segment to highlight both sides, follow the SVG connector, and keep original/generated panels in sync
 - **Multi-source navigation** — switch between source files with tabs when a source map contains multiple inputs
 - **Search and deep links** — search visible code with `Cmd/Ctrl+F`, then share links that preserve the selected source tab, stats panel, and a specific mapping via `?tab=`, `?stats=1`, and `?seg=`
+- **Position lookup** — jump to a generated or original `line:column`, or paste a stack frame; inspect exact points, mapped ranges, and explicit gaps, with shareable position links
 - **Mappings table and export** — inspect every mapping with filtering by position, snippet, source, or name, and copy the table as Markdown
 - **Validation and quality analysis** — catch invalid mappings, out-of-bounds/clamped targets, whitespace-target mappings, low coverage, and missing `sourcesContent`
 - **Coverage stats** — mapped vs unmapped bytes, total mappings, bad mapping counts, and per-file sizes
@@ -60,6 +61,18 @@ Deep-link query params also work on viewer URLs:
 - `?tab=<index>` selects the active original source file
 - `?stats=1` opens the stats panel
 - `?seg=<index>` focuses a specific mapping row and scrolls both code panes to it
+- `?pos=generated:<line>:<column>` reopens a generated position lookup
+- `?pos=original:<sourceIndex>:<line>:<column>` reopens an original position lookup
+
+Position links use 1-based lines and 0-based columns; original source indexes are 0-based.
+
+### Find a position
+
+Open **Find position** in the toolbar or press `Cmd/Ctrl+G`. Select **Generated** or **Original**, enter `line:column`, and press **Go**. For an original lookup, select the source file; every exact generated match is listed and can be selected to focus both panes.
+
+You can also paste one stack frame, such as `at calculateTotal (app.min.js:1:43)`. Choose **Stack trace: starts at 1** for its column format; the result is shown as generated position `1:42`. Plain source-map coordinates use **Source map: starts at 0**. Lines always start at 1.
+
+Generated results distinguish exact mapping points, positions inside an inferred mapped range, and unmapped gaps. Original coordinates are mapping anchors: character offsets are not interpolated. Both **Share** and the address-bar URL preserve the requested lookup position, including gaps.
 
 ## CLI
 

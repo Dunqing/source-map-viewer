@@ -39,16 +39,17 @@ export async function createComparePath(data: ShareableData): Promise<string> {
   return buildComparePath(await createShareSlug(data));
 }
 
-export async function copyShareUrl(data: ShareableData): Promise<"short" | "inline"> {
+export async function copyShareUrl(data: ShareableData, search = ""): Promise<"short" | "inline"> {
   const share = await createShortShare(data);
   if (share?.id || share?.url) {
-    const shortUrl = share.url ?? `${window.location.origin}/${share.id}`;
-    await navigator.clipboard.writeText(shortUrl);
-    replaceCurrentPath(share.id ? `/${share.id}` : new URL(shortUrl).pathname);
+    const shortUrl = new URL(share.url ?? `${window.location.origin}/${share.id}`);
+    shortUrl.search = search;
+    await navigator.clipboard.writeText(shortUrl.href);
+    replaceCurrentPath(`${share.id ? `/${share.id}` : shortUrl.pathname}${shortUrl.search}`);
     return "short";
   }
 
   const slug = await compressToHash(data);
-  await navigator.clipboard.writeText(`${window.location.origin}/${slug}`);
+  await navigator.clipboard.writeText(`${window.location.origin}/${slug}${search}`);
   return "inline";
 }

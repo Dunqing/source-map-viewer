@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import IconShare from "~icons/carbon/share";
+import IconLocation from "~icons/carbon/location";
 import IconCompare from "~icons/carbon/compare";
 import IconDebug from "~icons/carbon/debug";
 import IconChartBar from "~icons/carbon/chart-bar";
@@ -22,6 +23,7 @@ const themeTitle = {
 defineProps<{
   showStats: boolean;
   showMappings: boolean;
+  showPositionLookup?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -31,11 +33,14 @@ const emit = defineEmits<{
   aiDebug: [];
   share: [];
   compare: [];
+  positionLookup: [];
 }>();
 </script>
 
 <template>
-  <div class="flex items-center gap-1.5 px-3 py-1.5 border-b border-edge bg-surface">
+  <div
+    class="flex shrink-0 flex-wrap items-center gap-1.5 px-3 py-1.5 border-b border-edge bg-surface"
+  >
     <a
       class="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition mr-1"
       title="Back to home"
@@ -67,6 +72,16 @@ const emit = defineEmits<{
       AI Debug
     </button>
     <div class="w-px h-4 bg-edge mx-0.5" />
+    <button
+      class="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition"
+      :class="showPositionLookup ? 'bg-muted text-fg' : 'text-fg-dim hover:bg-muted'"
+      :aria-expanded="showPositionLookup ?? false"
+      title="Find position (Ctrl/Cmd+G)"
+      @click="emit('positionLookup')"
+    >
+      <IconLocation class="w-3.5 h-3.5" />
+      Find position
+    </button>
     <button
       class="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition"
       :class="showStats ? 'bg-muted text-fg' : 'text-fg-dim hover:bg-muted'"
