@@ -36,7 +36,8 @@ export async function createSharePath(data: ShareableData): Promise<string> {
 }
 
 export async function createComparePath(data: ShareableData): Promise<string> {
-  return buildComparePath(await createShareSlug(data));
+  // Comparing must not publish either input; only explicit Share creates remote data.
+  return buildComparePath(await compressToHash(data));
 }
 
 export async function copyShareUrl(data: ShareableData, search = ""): Promise<"short" | "inline"> {

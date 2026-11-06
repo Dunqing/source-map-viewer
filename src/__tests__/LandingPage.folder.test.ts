@@ -18,6 +18,7 @@ describe("LandingPage folder upload", () => {
 
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     useSourceMapStore().reset();
 
     vi.restoreAllMocks();
@@ -110,7 +111,9 @@ describe("LandingPage folder upload", () => {
     const store = useSourceMapStore();
     expect(store.generatedCode).toContain("console.log('folder');");
     expect(store.parsedData?.sourcesContent).toEqual(["const input = 1;"]);
-    expect(pushStateSpy).toHaveBeenCalledWith(null, "", "/folder-test");
+    expect(store.sessionSlug).toMatch(/^local-/);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(pushStateSpy).toHaveBeenCalledWith(null, "", `/${store.sessionSlug}`);
     expect(dispatchEventSpy).toHaveBeenCalledWith(expect.any(CustomEvent));
   });
 
@@ -204,14 +207,14 @@ describe("LandingPage folder upload", () => {
       "js/alpha.js",
       "js/beta.js",
     ]);
-    expect(store.sessionSlug).toBe("folder-multi-test");
+    expect(store.sessionSlug).toMatch(/^local-/);
     expect(store.sessionLabel).toBe("demo");
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-    expect(pushStateSpy).toHaveBeenCalledWith(null, "", "/folder-multi-test");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(pushStateSpy).toHaveBeenCalledWith(null, "", `/${store.sessionSlug}`);
     expect(dispatchEventSpy).toHaveBeenCalledWith(expect.any(CustomEvent));
     expect(JSON.parse(localStorage.getItem("smv-history") ?? "[]")[0]).toMatchObject({
       label: "demo · js/alpha.js (2 entries)",
-      slug: "folder-multi-test",
+      slug: store.sessionSlug,
       sessionLabel: "demo",
     });
   });
@@ -243,13 +246,14 @@ describe("LandingPage folder upload", () => {
     expect(store.generatedCode).toContain("alphaMessage");
     expect(store.generatedEntryCount).toBe(2);
     expect(store.generatedEntries.map((entry) => entry.entryPath)).toEqual(["alpha.js", "beta.js"]);
-    expect(store.sessionSlug).toBe("example-multi-test");
+    expect(store.sessionSlug).toMatch(/^local-/);
     expect(store.sessionLabel).toBe("Multi-Entry Bundle · esbuild");
-    expect(pushStateSpy).toHaveBeenCalledWith(null, "", "/example-multi-test");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(pushStateSpy).toHaveBeenCalledWith(null, "", `/${store.sessionSlug}`);
     expect(dispatchEventSpy).toHaveBeenCalledWith(expect.any(CustomEvent));
     expect(JSON.parse(localStorage.getItem("smv-history") ?? "[]")[0]).toMatchObject({
       label: "Multi-Entry Bundle · esbuild · alpha.js (2 entries)",
-      slug: "example-multi-test",
+      slug: store.sessionSlug,
       sessionLabel: "Multi-Entry Bundle · esbuild",
     });
   });
@@ -281,13 +285,14 @@ describe("LandingPage folder upload", () => {
     expect(store.generatedCode).toContain("alphaMessage");
     expect(store.generatedEntryCount).toBe(2);
     expect(store.generatedEntries.map((entry) => entry.entryPath)).toEqual(["alpha.js", "beta.js"]);
-    expect(store.sessionSlug).toBe("example-default-test");
+    expect(store.sessionSlug).toMatch(/^local-/);
     expect(store.sessionLabel).toBe("Multi-Entry Bundle · rolldown");
-    expect(pushStateSpy).toHaveBeenCalledWith(null, "", "/example-default-test");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(pushStateSpy).toHaveBeenCalledWith(null, "", `/${store.sessionSlug}`);
     expect(dispatchEventSpy).toHaveBeenCalledWith(expect.any(CustomEvent));
     expect(JSON.parse(localStorage.getItem("smv-history") ?? "[]")[0]).toMatchObject({
       label: "Multi-Entry Bundle · rolldown · alpha.js (2 entries)",
-      slug: "example-default-test",
+      slug: store.sessionSlug,
       sessionLabel: "Multi-Entry Bundle · rolldown",
     });
   });

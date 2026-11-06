@@ -41,7 +41,18 @@ describe("shareLinks", () => {
     } satisfies Partial<Response>) as typeof fetch;
 
     await expect(createSharePath(DATA)).resolves.toBe("/abc12345");
-    await expect(createComparePath(DATA)).resolves.toBe("/compare?a=abc12345");
+  });
+
+  it("uses inline compare paths without creating remote shares", async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const path = await createComparePath(DATA);
+    const slug = new URL(path, window.location.origin).searchParams.get("a");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(slug).toBeTruthy();
+    expect(await decompressFromHash(slug!)).toEqual(DATA);
   });
 
   it("falls back to inline hashes when the share API is unavailable", async () => {

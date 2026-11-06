@@ -14,8 +14,8 @@ A visual tool for inspecting, comparing, and sharing JavaScript/CSS source maps.
 - **Validation and quality analysis** — catch invalid mappings, out-of-bounds/clamped targets, whitespace-target mappings, low coverage, and missing `sourcesContent`
 - **Coverage stats** — mapped vs unmapped bytes, total mappings, bad mapping counts, and per-file sizes
 - **Source map diffing** — compare two source maps from shared links, public URLs, pasted content, or local files to see which mappings stayed the same, changed, were added, or were removed
-- **Shareable short URLs** — source map data stored in KV with 8-char short IDs, auto-renewed 30-day TTL on every access
-- **Recent history and built-in examples** — reopen the last 5 visualizations from local storage or load bundled examples for esbuild/Oxc comparisons
+- **Shareable short URLs** — explicitly click **Share** to store source map data in KV with an 8-char short ID and a 30-day TTL, auto-renewed on every access; inline compressed links remain the offline fallback
+- **Recent history and built-in examples** — reopen the last 5 visualizations from local storage or load bundled examples for esbuild/Oxc comparisons; tab-local inspections can be restored while their tab session remains available
 - **LLM-friendly** — AI tools get a structured markdown debug report when fetching a shared URL (content negotiation via User-Agent / `Accept` headers)
 - **AI debug prompt** — generate the same report locally from the toolbar and copy it straight to your assistant
 - **Theme toggle** — light, dark, and system modes
@@ -54,7 +54,9 @@ The report includes original/generated code with line numbers, a mapping table w
 
 ## Compare and Share
 
-Use **Compare** to diff two source maps from shared viewer links, public asset URLs, pasted content, or local uploads. If both sides came from shareable links, compare state is preserved in `/compare?a=<id>&b=<id>`; otherwise the compare session stays local to the current tab. The comparison view shows a summary of mappings that are unchanged, changed, removed, or added, with expandable code context for each difference.
+Uploads, pasted input, fetched URLs, and examples open as `local-…` viewer routes backed by tab-scoped `sessionStorage`; loading them does not create a remote share. These routes support same-tab reloads and back/forward navigation, but they are not portable to another tab or browser and cannot be restored after their tab session is discarded. Click **Share** to create a durable short URL, with the existing inline compressed URL as the fallback when the share API is unavailable.
+
+Use **Compare** to diff two source maps from shared viewer links, public asset URLs, pasted content, or local uploads. Starting a comparison from the viewer uses an inline compressed link and does not create a remote share. If both sides came from shareable links, compare state is preserved in `/compare?a=<id>&b=<id>`; otherwise the compare session stays local to the current tab. The comparison view shows a summary of mappings that are unchanged, changed, removed, or added, with expandable code context for each difference.
 
 Deep-link query params also work on viewer URLs:
 

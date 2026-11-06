@@ -15,11 +15,7 @@ import { formatMultiEntryHistoryLabel } from "../composables/historyLabels";
 import { useTheme } from "../composables/useTheme";
 import { useHistory } from "../composables/useHistory";
 import { navigateToPath } from "../composables/navigation";
-import { createSharePath } from "../composables/shareLinks";
-import {
-  cacheSessionCollection,
-  getCachedSessionCollection,
-} from "../composables/useSessionCollectionCache";
+import { createLocalSession, getCachedSession } from "../composables/useSessionCollectionCache";
 import { exampleSources, type ExampleSource } from "../examples";
 import { APP_DESCRIPTION, APP_NAME } from "../constants";
 import FileDropZone from "../components/FileDropZone.vue";
@@ -90,29 +86,25 @@ function getHistoryLabel(
   );
 }
 
-async function navigateWithData(
+function navigateWithData(
   data: { generatedCode: string; sourceMapJson: string },
   label: string,
   sessionEntries?: ResolvedFileCollection[],
   sessionLabel?: string,
 ) {
-  const path = await createSharePath(data);
-  if (sessionEntries && sessionEntries.length > 1) {
-    const slug = path.slice(1);
-    cacheSessionCollection(slug, sessionEntries);
-    store.loadSourceMapCollection(sessionEntries, 0, slug, sessionLabel ?? label);
-  } else {
-    store.loadSourceMap(data.generatedCode, data.sourceMapJson);
-  }
+  const entries = sessionEntries?.length ? sessionEntries : [{ ...data, label, entryPath: label }];
+  const resolvedSessionLabel = sessionLabel ?? label;
+  const slug = createLocalSession(entries, resolvedSessionLabel);
+  store.loadSourceMapCollection(entries, 0, slug, resolvedSessionLabel);
   if (store.error) throw new Error(store.error);
 
   addHistoryEntry({
     label: getHistoryLabel(label, sessionEntries, sessionLabel),
-    slug: path.slice(1),
+    slug,
     timestamp: Date.now(),
     sessionLabel,
   });
-  navigateToPath(path);
+  navigateToPath(`/${slug}`);
 }
 
 async function handleFiles(files: File[]) {
@@ -124,7 +116,7 @@ async function handleFiles(files: File[]) {
     const label = primaryEntry.label ?? files.map((f) => f.name).join(" + ");
     const sessionLabel =
       results.length > 1 ? (getUploadRootLabel(files) ?? "Build folder") : undefined;
-    await navigateWithData(primaryEntry, label, results, sessionLabel);
+    navigateWithData(primaryEntry, label, results, sessionLabel);
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load files";
   } finally {
@@ -137,7 +129,7 @@ async function handlePaste() {
     error.value = null;
     loading.value = true;
     const result = await loadFromText(pasteContent.value);
-    await navigateWithData(result, "Pasted code");
+    navigateWithData(result, "Pasted code");
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to parse pasted content";
   } finally {
@@ -155,7 +147,7 @@ async function handleUrl() {
       parsedUrl.protocol === "data:"
         ? "data:application/json"
         : parsedUrl.pathname.split("/").pop() || urlInput.value;
-    await navigateWithData(result, label);
+    navigateWithData(result, label);
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to fetch URL";
   } finally {
@@ -163,10 +155,10 @@ async function handleUrl() {
   }
 }
 
-async function loadExample(source: ExampleSource, transformer: string) {
+function loadExample(source: ExampleSource, transformer: string) {
   const data = source.transformers[transformer];
   if (!data) return;
-  await navigateWithData(
+  navigateWithData(
     data.entries?.[0] ?? data,
     `${source.name} · ${transformer}`,
     data.entries,
@@ -196,23 +188,23 @@ function getDefaultTransformer(source: ExampleSource): string | undefined {
   return getOrderedTransformers(source)[0];
 }
 
-async function loadDefaultExample(source: ExampleSource) {
+function loadDefaultExample(source: ExampleSource) {
   const transformer = getDefaultTransformer(source);
   if (!transformer) return;
-  await loadExample(source, transformer);
+  loadExample(source, transformer);
 }
 
 function loadFromHistory(entry: { slug: string; sessionLabel?: string }) {
   const url = new URL(`/${entry.slug}`, window.location.origin);
   const slug = url.pathname.slice(1);
-  const cachedEntries = getCachedSessionCollection(slug);
-  if (cachedEntries) {
+  const cachedSession = getCachedSession(slug);
+  if (cachedSession) {
     const entryIndex = Number(url.searchParams.get("entry"));
     store.loadSourceMapCollection(
-      cachedEntries,
+      cachedSession.entries,
       Number.isFinite(entryIndex) ? entryIndex : 0,
       slug,
-      entry.sessionLabel,
+      cachedSession.label || entry.sessionLabel,
     );
   }
   navigateToPath(`${url.pathname}${url.search}`);
