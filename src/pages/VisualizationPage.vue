@@ -20,6 +20,7 @@ import AiDebugPanel from "../components/AiDebugPanel.vue";
 import type { MappingSegment } from "../core/types";
 import { lookupPosition, type PositionQuery } from "../core/positionLookup";
 import PositionLookupPanel from "../components/PositionLookupPanel.vue";
+import WorkspaceDialog from "../components/WorkspaceDialog.vue";
 
 const store = useSourceMapStore();
 const { addEntry: addHistoryEntry } = useHistory();
@@ -27,6 +28,13 @@ useTheme();
 
 const showStats = ref(false);
 const showMappings = ref(false);
+const showFiles = ref(false);
+const generatedFilename = computed(
+  () => store.activeGeneratedEntry?.generatedPath || store.parsedData?.file || "output.js",
+);
+const originalContentMissing = computed(
+  () => store.parsedData?.sourcesContent[store.activeSourceIndex] == null,
+);
 const selectedSegIndex = ref<number | null>(null);
 const showPositionLookup = ref(false);
 const positionQuery = shallowRef<PositionQuery | null>(null);
@@ -193,16 +201,41 @@ watch(
   },
 );
 
+const searchBarRef = ref<InstanceType<typeof SearchBar> | null>(null);
+
+function revealCode() {
+  showFiles.value = false;
+  if (window.matchMedia("(max-width: 680px)").matches) showStats.value = false;
+}
+
+function openPositionLookup() {
+  revealCode();
+  showPositionLookup.value = true;
+  nextTick(() => lookupPanelRef.value?.focusInput());
+}
+
+function closePositionLookup() {
+  const restoreFocus = lookupPanelRef.value?.$el.contains(document.activeElement);
+  showPositionLookup.value = false;
+  if (restoreFocus) nextTick(() => document.getElementById("position-lookup-toggle")?.focus());
+}
+
+async function openSearch() {
+  revealCode();
+  showSearch.value = true;
+  await nextTick();
+  searchBarRef.value?.focusInput();
+}
+
 function handleKeydown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "g") {
     e.preventDefault();
-    showPositionLookup.value = true;
-    nextTick(() => lookupPanelRef.value?.focusInput());
+    openPositionLookup();
   }
-  if (e.key === "Escape") showPositionLookup.value = false;
-  if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+  if (e.key === "Escape" && !showFiles.value) closePositionLookup();
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
     e.preventDefault();
-    showSearch.value = true;
+    void openSearch();
   }
 }
 
@@ -251,6 +284,7 @@ function handleGeneratedSegmentClick(segment: MappingSegment) {
 }
 
 function handleGeneratedTabSelect(index: number) {
+  revealCode();
   if (index === store.activeGeneratedEntryIndex) return;
   selectedSegIndex.value = null;
   positionQuery.value = null;
@@ -349,13 +383,16 @@ async function handleShare() {
 </script>
 
 <template>
-  <div class="h-screen flex flex-col bg-panel text-fg">
+  <div class="workspace-shell">
     <Toolbar
       v-if="ready"
       :show-stats="showStats"
       :show-mappings="showMappings"
       :show-position-lookup="showPositionLookup"
-      @position-lookup="showPositionLookup = !showPositionLookup"
+      :show-files="showFiles"
+      @files="showFiles = true"
+      @search="openSearch"
+      @position-lookup="showPositionLookup ? closePositionLookup() : openPositionLookup()"
       @update:show-stats="showStats = $event"
       @update:show-mappings="showMappings = $event"
       @home="handleBack"
@@ -364,32 +401,67 @@ async function handleShare() {
       @compare="handleCompare"
     />
 
-    <PositionLookupPanel
-      v-if="ready && showPositionLookup"
-      ref="lookupPanelRef"
-      :query="positionQuery"
-      :selected-segment="lookupMatch"
-      @lookup="handlePositionLookup"
-      @select="selectLookupMatch"
-      @close="showPositionLookup = false"
-    />
-
-    <div v-if="ready" class="flex-1 flex flex-col overflow-hidden relative">
-      <SearchBar :visible="showSearch" @search="searchQuery = $event" @close="showSearch = false" />
+    <WorkspaceDialog
+      v-if="ready"
+      :open="showFiles"
+      label="Files"
+      title="Files"
+      @close="showFiles = false"
+    >
+      <h3 class="file-heading">Generated entries</h3>
       <EntrypointTabs
         v-if="store.generatedEntryCount > 1"
+        class="file-list"
         :entries="generatedTabs"
         :active-index="store.activeGeneratedEntryIndex"
         @select="handleGeneratedTabSelect"
       />
+      <p v-else class="text-sm text-fg-dim break-all">{{ generatedFilename }}</p>
+      <h3 class="file-heading">Original sources</h3>
+      <SourceTabs class="file-list" @select="revealCode" />
+      <h3 class="file-heading">Source map</h3>
+      <p class="text-xs text-fg-muted break-all">
+        {{ store.activeGeneratedEntry?.sourceMapPath || "Source map path is not available." }}
+      </p>
+    </WorkspaceDialog>
 
-      <div class="flex-1 flex overflow-hidden relative">
-        <!-- Left: Original code -->
-        <div class="flex-1 flex flex-col border-r border-edge min-w-0">
-          <div class="px-3 py-1 text-xs font-medium text-fg-muted border-b border-edge bg-muted">
-            Original code
+    <PositionLookupPanel
+      v-if="ready && showPositionLookup"
+      id="position-lookup-panel"
+      ref="lookupPanelRef"
+      class="workspace-lookup"
+      :query="positionQuery"
+      :selected-segment="lookupMatch"
+      @lookup="handlePositionLookup"
+      @select="selectLookupMatch"
+      @close="closePositionLookup"
+    />
+
+    <div v-if="ready" class="workspace-content">
+      <SearchBar
+        ref="searchBarRef"
+        :visible="showSearch"
+        @search="searchQuery = $event"
+        @close="showSearch = false"
+      />
+      <div class="workspace-panes" :class="{ 'has-details': showStats }">
+        <div class="workspace-pane">
+          <header class="workspace-code-header">
+            <button
+              type="button"
+              :title="store.activeSourceName"
+              aria-haspopup="dialog"
+              @click="showFiles = true"
+            >
+              {{ store.activeSourceName
+              }}<small v-if="store.sourceCount > 1"> ({{ store.sourceCount }})</small>
+            </button>
+            <span>Original</span>
+          </header>
+          <div v-if="originalContentMissing" class="px-6 py-4 text-sm text-fg-muted">
+            Original content is not embedded in this source map. Its path and mapping coordinates
+            remain available.
           </div>
-          <SourceTabs v-if="store.sourceCount > 1" />
           <CodePanel
             ref="originalPanelRef"
             :code="store.activeSourceContent"
@@ -397,51 +469,59 @@ async function handleShare() {
             side="original"
             :focus-position="originalFocus"
             :search-query="searchQuery"
-            class="flex-1"
+            class="flex-1 min-h-0"
             @segment-click="handleOriginalSegmentClick"
           />
         </div>
-
-        <!-- Right: Generated code -->
-        <div class="flex-1 flex flex-col min-w-0">
-          <div class="px-3 py-1 text-xs font-medium text-fg-muted border-b border-edge bg-muted">
-            Generated code
-          </div>
+        <div class="workspace-pane">
+          <header class="workspace-code-header">
+            <button
+              type="button"
+              :title="generatedFilename"
+              aria-haspopup="dialog"
+              @click="showFiles = true"
+            >
+              {{ generatedFilename }}
+            </button>
+            <span>Generated</span>
+          </header>
           <CodePanel
             ref="generatedPanelRef"
             :code="store.generatedCode"
-            :filename="store.parsedData?.file ?? 'output.js'"
+            :filename="generatedFilename"
             side="generated"
             :focus-position="generatedFocus"
             :search-query="searchQuery"
-            class="flex-1"
+            class="flex-1 min-h-0"
             @segment-click="handleGeneratedSegmentClick"
           />
         </div>
-
-        <!-- Connector arrow overlay -->
         <MappingConnector :original-panel="originalPanelRef" :generated-panel="generatedPanelRef" />
-
-        <StatsPanel v-if="showStats" />
+        <aside v-if="showStats" class="workspace-side-panel" aria-label="Source map details">
+          <header class="workspace-side-heading">
+            <h2>Details</h2>
+            <button
+              type="button"
+              class="workspace-icon"
+              aria-label="Close details"
+              @click="showStats = false"
+            >
+              ×
+            </button>
+          </header>
+          <StatsPanel />
+        </aside>
       </div>
     </div>
-
     <StatusBar v-if="ready" @toggle-mappings="showMappings = !showMappings" />
     <MappingsPanel
       v-if="ready && showMappings"
       ref="mappingsPanelRef"
       @click-mapping="handleMappingClick"
     />
-
-    <Transition name="fade">
-      <div
-        v-if="toast"
-        class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 rounded-lg bg-zinc-800 dark:bg-zinc-200 px-4 py-2 text-sm text-white dark:text-zinc-900 shadow-lg"
-      >
-        {{ toast }}
-      </div>
-    </Transition>
-
+    <Transition name="fade"
+      ><div v-if="toast" class="workspace-toast" role="status">{{ toast }}</div></Transition
+    >
     <AiDebugPanel v-if="showAiDebug" @close="showAiDebug = false" />
   </div>
 </template>

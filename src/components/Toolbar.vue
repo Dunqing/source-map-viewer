@@ -1,121 +1,164 @@
 <script setup lang="ts">
-import IconShare from "~icons/carbon/share";
-import IconLocation from "~icons/carbon/location";
-import IconCompare from "~icons/carbon/compare";
-import IconDebug from "~icons/carbon/debug";
-import IconChartBar from "~icons/carbon/chart-bar";
-import IconDataTable from "~icons/carbon/data-table";
-import IconSun from "~icons/carbon/sun";
-import IconMoon from "~icons/carbon/moon";
-import IconScreen from "~icons/carbon/screen";
-import IconLogoGithub from "~icons/carbon/logo-github";
+import { onMounted, onUnmounted, ref } from "vue";
+import IconOverflow from "~icons/carbon/overflow-menu-horizontal";
 import { useTheme } from "../composables/useTheme";
 import { APP_NAME } from "../constants";
 
 const { theme, toggleTheme } = useTheme();
-
 const themeTitle = {
   light: "Light mode (click for dark)",
   dark: "Dark mode (click for system)",
   system: "System mode (click for light)",
 } as const;
 
-defineProps<{
-  showStats: boolean;
-  showMappings: boolean;
-  showPositionLookup?: boolean;
-}>();
+withDefaults(
+  defineProps<{
+    mode?: "inspect" | "compare";
+    inspectHref?: string;
+    showStats?: boolean;
+    showMappings?: boolean;
+    showPositionLookup?: boolean;
+    showFiles?: boolean;
+  }>(),
+  { mode: "inspect", inspectHref: "/" },
+);
 
 const emit = defineEmits<{
   "update:showStats": [value: boolean];
   "update:showMappings": [value: boolean];
   home: [];
+  files: [];
+  search: [];
   aiDebug: [];
   share: [];
   compare: [];
   positionLookup: [];
 }>();
+
+const showMore = ref(false);
+const menu = ref<HTMLElement | null>(null);
+const moreButton = ref<HTMLButtonElement | null>(null);
+function closeMore() {
+  showMore.value = false;
+}
+function handleOutside(event: MouseEvent) {
+  if (!menu.value?.contains(event.target as Node)) closeMore();
+}
+function handleEscape(event: KeyboardEvent) {
+  if (event.key === "Escape" && showMore.value) {
+    closeMore();
+    moreButton.value?.focus();
+  }
+}
+onMounted(() => {
+  document.addEventListener("pointerdown", handleOutside);
+  document.addEventListener("keydown", handleEscape);
+});
+onUnmounted(() => {
+  document.removeEventListener("pointerdown", handleOutside);
+  document.removeEventListener("keydown", handleEscape);
+});
 </script>
 
 <template>
-  <div
-    class="flex shrink-0 flex-wrap items-center gap-1.5 px-3 py-1.5 border-b border-edge bg-surface"
-  >
-    <a
-      class="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition mr-1"
-      title="Back to home"
-      @click="emit('home')"
-    >
-      <img :src="'/logo.svg'" alt="Logo" class="h-5 w-5" />
-      <span class="text-sm font-semibold text-fg">{{ APP_NAME }}</span>
-    </a>
-    <div class="flex-1" />
-    <button
-      class="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-fg-dim hover:bg-muted transition"
-      @click="emit('share')"
-    >
-      <IconShare class="w-3.5 h-3.5" />
-      Share
-    </button>
-    <button
-      class="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-fg-dim hover:bg-muted transition"
-      @click="emit('compare')"
-    >
-      <IconCompare class="w-3.5 h-3.5" />
-      Compare
-    </button>
-    <button
-      class="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-fg-dim hover:bg-muted transition"
-      @click="emit('aiDebug')"
-    >
-      <IconDebug class="w-3.5 h-3.5" />
-      AI Debug
-    </button>
-    <div class="w-px h-4 bg-edge mx-0.5" />
-    <button
-      class="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition"
-      :class="showPositionLookup ? 'bg-muted text-fg' : 'text-fg-dim hover:bg-muted'"
-      :aria-expanded="showPositionLookup ?? false"
-      title="Find position (Ctrl/Cmd+G)"
-      @click="emit('positionLookup')"
-    >
-      <IconLocation class="w-3.5 h-3.5" />
-      Find position
-    </button>
-    <button
-      class="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition"
-      :class="showStats ? 'bg-muted text-fg' : 'text-fg-dim hover:bg-muted'"
-      @click="emit('update:showStats', !showStats)"
-    >
-      <IconChartBar class="w-3.5 h-3.5" />
-      Stats
-    </button>
-    <button
-      class="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition"
-      :class="showMappings ? 'bg-muted text-fg' : 'text-fg-dim hover:bg-muted'"
-      @click="emit('update:showMappings', !showMappings)"
-    >
-      <IconDataTable class="w-3.5 h-3.5" />
-      Mappings
-    </button>
-    <div class="w-px h-4 bg-edge mx-0.5" />
-    <a
-      href="https://github.com/Dunqing/source-map-viewer"
-      target="_blank"
-      rel="noopener"
-      class="p-1.5 rounded text-fg-muted hover:text-fg-dim hover:bg-muted transition"
-      title="GitHub"
-    >
-      <IconLogoGithub class="w-4 h-4" />
-    </a>
-    <button
-      class="p-1.5 rounded text-fg-muted hover:text-fg-dim hover:bg-muted transition"
-      :title="themeTitle[theme]"
-      @click="toggleTheme"
-    >
-      <IconMoon v-if="theme === 'light'" class="w-4 h-4" />
-      <IconSun v-else-if="theme === 'dark'" class="w-4 h-4" />
-      <IconScreen v-else class="w-4 h-4" />
-    </button>
-  </div>
+  <header class="workspace-toolbar">
+    <a class="workspace-brand" href="/" @click.prevent="emit('home')">{{ APP_NAME }}</a>
+    <nav class="workspace-modes" aria-label="Workspace mode">
+      <a v-if="mode === 'compare'" :href="inspectHref">Inspect</a>
+      <span v-else aria-current="page">Inspect</span>
+      <span v-if="mode === 'compare'" aria-current="page">Compare</span>
+      <button v-else type="button" @click="emit('compare')">Compare</button>
+    </nav>
+    <div class="workspace-tools">
+      <button type="button" class="workspace-button" @click="emit('home')">Open</button>
+      <button
+        type="button"
+        class="workspace-button"
+        :aria-expanded="showFiles ?? false"
+        aria-haspopup="dialog"
+        @click="emit('files')"
+      >
+        Files
+      </button>
+      <button
+        v-if="mode === 'inspect'"
+        type="button"
+        class="workspace-button"
+        id="position-lookup-toggle"
+        :aria-expanded="showPositionLookup ?? false"
+        aria-controls="position-lookup-panel"
+        title="Find position (Ctrl/Cmd+G)"
+        @click="emit('positionLookup')"
+      >
+        Find<span class="workspace-position-label"> position</span>
+      </button>
+      <button
+        type="button"
+        class="workspace-button"
+        :aria-expanded="showStats ?? false"
+        @click="emit('update:showStats', !showStats)"
+      >
+        Details
+      </button>
+      <div ref="menu" class="workspace-more">
+        <button
+          ref="moreButton"
+          type="button"
+          class="workspace-icon"
+          aria-label="More tools"
+          :aria-expanded="showMore"
+          @click="showMore = !showMore"
+        >
+          <IconOverflow />
+        </button>
+        <div v-show="showMore" class="workspace-menu">
+          <template v-if="mode === 'inspect'">
+            <button
+              type="button"
+              @click="
+                emit('search');
+                closeMore();
+              "
+            >
+              Search code <kbd>⌘ / Ctrl F</kbd>
+            </button>
+            <button
+              type="button"
+              @click="
+                emit('update:showMappings', !showMappings);
+                closeMore();
+              "
+            >
+              {{ showMappings ? "Hide mappings" : "Mapping table" }}
+            </button>
+            <button
+              type="button"
+              @click="
+                emit('aiDebug');
+                closeMore();
+              "
+            >
+              AI Debug
+            </button>
+            <button
+              type="button"
+              @click="
+                emit('share');
+                closeMore();
+              "
+            >
+              Share
+            </button>
+          </template>
+          <slot name="options" />
+          <button type="button" :title="themeTitle[theme]" @click="toggleTheme">
+            Theme: {{ theme }}
+          </button>
+          <a href="https://github.com/Dunqing/source-map-viewer" target="_blank" rel="noopener"
+            >GitHub</a
+          >
+        </div>
+      </div>
+    </div>
+  </header>
 </template>

@@ -44,82 +44,226 @@ async function handleCompare() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-base p-4">
-    <div class="max-w-lg w-full space-y-6">
-      <a
-        href="/"
-        class="flex items-center gap-1 text-sm text-fg-muted hover:text-fg-dim transition"
-      >
+  <div class="compare-landing">
+    <div class="compare-content">
+      <a href="/" class="compare-back">
         <IconArrowLeft class="w-4 h-4" />
         Back to home
       </a>
 
-      <div class="text-center">
-        <h1 class="text-2xl font-bold tracking-tight text-fg mb-1">Compare Source Maps</h1>
-        <p class="text-sm font-mono text-fg-muted">
+      <div class="compare-heading">
+        <h1>Compare Source Maps</h1>
+        <p>
           {{
             prefilledA
               ? "Enter a second URL to compare against"
               : "Paste two viewer URLs to diff their mappings"
           }}
         </p>
-        <p v-if="!prefilledA" class="text-xs text-fg-muted mt-2">
-          Tip: you can also click Compare in the visualization toolbar to pre-fill URL A
-        </p>
       </div>
 
-      <div
-        v-if="error"
-        class="rounded-lg bg-red-50 dark:bg-red-900/20 p-3 text-red-700 dark:text-red-400 text-sm"
-      >
+      <div v-if="error" class="compare-error">
         {{ error }}
       </div>
 
-      <div class="space-y-3">
+      <div class="compare-inputs">
         <!-- URL A -->
-        <div>
-          <label class="text-xs uppercase tracking-widest font-semibold text-fg-muted mb-1.5 block">
-            URL A
-          </label>
-          <div
-            v-if="prefilledA"
-            class="rounded-lg border border-green-500 dark:border-green-400 bg-surface px-3 py-2 text-sm font-mono text-fg-dim"
-          >
+        <div class="compare-input-row">
+          <label class="compare-label">URL A</label>
+          <div v-if="prefilledA" class="compare-prefilled">
             {{ prefilledA.label }}
           </div>
           <input
             v-else
             v-model="urlA"
-            class="w-full rounded-lg border border-edge bg-muted px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="compare-field"
             placeholder="https://source-map-viewer.void.app/abc123 or just abc123"
             @keydown.enter="handleCompare"
           />
         </div>
 
         <!-- URL B -->
-        <div>
-          <label class="text-xs uppercase tracking-widest font-semibold text-fg-muted mb-1.5 block">
-            URL B
-          </label>
+        <div class="compare-input-row">
+          <label class="compare-label">URL B</label>
           <input
             v-model="urlB"
-            class="w-full rounded-lg border border-edge bg-muted px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="compare-field"
             placeholder="https://source-map-viewer.void.app/xyz789 or just xyz789"
             @keydown.enter="handleCompare"
           />
-          <p class="text-xs text-fg-muted mt-1">
+          <p class="compare-help">
             Open another source map in the viewer, click Share, then paste the URL here
           </p>
         </div>
       </div>
 
       <button
-        class="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        class="compare-submit"
         :disabled="(!prefilledA && !urlA.trim()) || !urlB.trim()"
         @click="handleCompare"
       >
         Compare
       </button>
+
+      <p v-if="!prefilledA" class="compare-tip">
+        Tip: you can also click Compare in the visualization toolbar to pre-fill URL A
+      </p>
     </div>
   </div>
 </template>
+
+<style scoped>
+.compare-landing {
+  --compare-accent: #246fc6;
+  min-height: 100dvh;
+  padding: 64px 24px 32px;
+  background: var(--c-bg);
+  color: var(--c-text);
+}
+
+.compare-content {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.compare-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--c-text-3);
+  font-size: 13px;
+  transition: color 120ms;
+}
+
+.compare-back:hover {
+  color: var(--c-text);
+}
+
+.compare-heading {
+  margin: 34px 0 28px;
+}
+
+.compare-heading h1 {
+  font-size: 26px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.7px;
+}
+
+.compare-heading p {
+  margin-top: 10px;
+  color: var(--c-text-3);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.compare-inputs {
+  border-top: 1px solid var(--c-border);
+}
+
+.compare-input-row {
+  padding: 22px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.compare-label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--c-text-2);
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.compare-field,
+.compare-prefilled {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 4px;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.compare-field::placeholder {
+  color: var(--c-text-3);
+}
+
+.compare-prefilled {
+  background: var(--c-bg-soft);
+  overflow-wrap: anywhere;
+}
+
+.compare-help,
+.compare-tip {
+  color: var(--c-text-3);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.compare-help {
+  margin-top: 10px;
+}
+
+.compare-tip {
+  margin-top: 24px;
+}
+
+.compare-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  margin-top: 22px;
+  padding: 8px 20px;
+  border-radius: 4px;
+  background: var(--compare-accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 120ms;
+}
+
+.compare-submit:hover {
+  background: #1e62b0;
+}
+
+.compare-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.compare-error {
+  margin-bottom: 20px;
+  padding: 12px 14px;
+  border-left: 2px solid var(--c-text-3);
+  background: var(--c-bg-soft);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.compare-landing :is(button, a, input):focus-visible {
+  outline: 2px solid var(--compare-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .compare-landing {
+    padding: 32px 18px;
+  }
+
+  .compare-heading h1 {
+    font-size: 23px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compare-landing * {
+    transition: none !important;
+  }
+}
+</style>

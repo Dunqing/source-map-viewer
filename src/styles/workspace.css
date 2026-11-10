@@ -1,0 +1,405 @@
+.workspace-shell {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--c-bg);
+  color: var(--c-text);
+}
+.workspace-toolbar {
+  min-height: 52px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-bg);
+}
+.workspace-brand {
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.4px;
+  white-space: nowrap;
+}
+.workspace-modes {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  gap: 20px;
+  font-size: 13px;
+  color: var(--c-text-3);
+}
+.workspace-modes > * {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  position: relative;
+  white-space: nowrap;
+}
+.workspace-modes [aria-current="page"] {
+  color: var(--c-text);
+  font-weight: 550;
+}
+.workspace-modes [aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  height: 2px;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  background: #2a78d6;
+}
+.workspace-tools {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+}
+.workspace-button,
+.workspace-icon {
+  padding: 7px 9px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--c-text-3);
+  white-space: nowrap;
+}
+.workspace-button:hover,
+.workspace-icon:hover,
+.workspace-button[aria-expanded="true"] {
+  background: var(--c-bg-soft);
+  color: var(--c-text);
+}
+.workspace-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.workspace-icon svg {
+  width: 17px;
+  height: 17px;
+}
+.workspace-more {
+  position: relative;
+}
+.workspace-menu {
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  width: 235px;
+  padding: 6px;
+  border: 1px solid var(--c-border);
+  background: var(--c-bg);
+  box-shadow: 0 8px 28px #10213614;
+  border-radius: 7px;
+  z-index: 40;
+}
+.workspace-menu > button,
+.workspace-menu > a,
+.workspace-menu > label {
+  width: 100%;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  text-align: left;
+  border-radius: 3px;
+}
+.workspace-menu > button:hover,
+.workspace-menu > a:hover {
+  background: var(--c-bg-soft);
+}
+.workspace-menu kbd {
+  font-size: 10px;
+  margin-left: auto;
+  color: var(--c-text-3);
+}
+.workspace-dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--c-border);
+  border-radius: 9px;
+  background: var(--c-bg);
+  color: var(--c-text);
+  box-shadow: 0 20px 80px #10213626;
+}
+.workspace-dialog::backdrop {
+  background: #14203445;
+}
+.workspace-dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 22px;
+}
+.workspace-dialog-heading h2 {
+  font-size: 16px;
+  font-weight: 550;
+}
+.workspace-dialog .file-heading {
+  font-size: 12px;
+  color: var(--c-text-3);
+  margin: 20px 0 8px;
+}
+.workspace-dialog .file-heading:first-child {
+  margin-top: 0;
+}
+.workspace-dialog .file-list {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  max-height: 35vh;
+  overflow: auto;
+}
+.workspace-dialog .file-list button {
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.workspace-dialog .file-list > span {
+  display: none;
+}
+.workspace-dialog .file-list button[aria-pressed="true"] {
+  background: var(--c-bg-soft);
+  color: var(--c-text);
+}
+.workspace-dialog :is(input, select, textarea):focus-visible,
+.workspace-shell :is(button, a, select, summary):focus-visible {
+  outline: 2px solid #2a78d6;
+  outline-offset: 3px;
+}
+.workspace-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+.workspace-panes {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+.workspace-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.workspace-pane + .workspace-pane {
+  border-left: 1px solid var(--c-border);
+}
+.workspace-code-header {
+  height: 34px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.workspace-code-header button {
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-code-header button[aria-haspopup="dialog"]::after {
+  content: "⌄";
+  padding-left: 6px;
+  color: var(--c-text-3);
+}
+.workspace-code-header small {
+  color: var(--c-text-3);
+  font-size: 11px;
+}
+.workspace-lookup {
+  flex-shrink: 0;
+  max-height: min(40dvh, 320px);
+  overflow: auto;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-bg-soft);
+}
+.workspace-code-header span {
+  margin-left: auto;
+  color: var(--c-text-3);
+  font-size: 12px;
+}
+.workspace-code-header .workspace-filename {
+  margin-left: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-text);
+}
+.workspace-side-panel {
+  flex-shrink: 0;
+  width: 285px;
+  overflow: auto;
+  border-left: 1px solid var(--c-border);
+}
+.workspace-side-panel > div {
+  border: 0;
+  width: 100%;
+  background: transparent;
+}
+.workspace-side-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 16px 0;
+  font-size: 13px;
+  font-weight: 550;
+}
+.workspace-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 32px;
+  padding: 6px 22px;
+  border-top: 1px solid var(--c-border);
+  background: var(--c-bg);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.workspace-footer > :first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-footer button {
+  color: var(--c-text-3);
+  white-space: nowrap;
+}
+.workspace-footer button:hover {
+  color: var(--c-text);
+}
+.workspace-footer .footer-spacer {
+  flex: 1;
+}
+.workspace-toast {
+  position: fixed;
+  bottom: 55px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 10px 16px;
+  background: var(--c-text);
+  color: var(--c-bg);
+  border-radius: 5px;
+  font-size: 13px;
+  z-index: 60;
+}
+@media (max-width: 900px) {
+  .workspace-toolbar {
+    padding: 0 16px;
+    gap: 18px;
+  }
+  .workspace-brand {
+    font-size: 14px;
+  }
+  .workspace-button {
+    padding: 7px;
+  }
+  .workspace-code-header {
+    padding: 0 16px;
+  }
+}
+@media (max-width: 680px) {
+  .workspace-toolbar {
+    min-height: 92px;
+    padding: 8px 14px 0;
+    gap: 0;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-content: space-between;
+  }
+  .workspace-brand {
+    order: 0;
+    font-size: 14px;
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+  }
+  .workspace-tools {
+    order: 1;
+    margin-left: 0;
+  }
+  .workspace-button {
+    font-size: 11px;
+    padding: 6px;
+  }
+  .workspace-icon {
+    padding: 6px;
+  }
+  .workspace-position-label {
+    display: none;
+  }
+  .workspace-lookup {
+    padding: 10px 14px;
+  }
+  .workspace-modes {
+    order: 2;
+    height: 42px;
+    flex-basis: 100%;
+    gap: 20px;
+  }
+  .workspace-panes {
+    flex-direction: column;
+  }
+  .workspace-pane + .workspace-pane {
+    border-left: 0;
+    border-top: 1px solid var(--c-border);
+  }
+  .workspace-code-header {
+    height: 38px;
+    font-size: 11px;
+  }
+  .workspace-code-header span {
+    font-size: 11px;
+  }
+  .workspace-side-panel {
+    width: 100%;
+    height: 100%;
+    border-left: 0;
+  }
+  .workspace-panes.has-details > .workspace-pane {
+    display: none;
+  }
+  .workspace-panes.has-details > .workspace-side-panel {
+    flex: 1;
+  }
+  .workspace-footer {
+    padding: 6px 12px;
+    font-size: 11px;
+    gap: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-shell *,
+  .workspace-dialog * {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}

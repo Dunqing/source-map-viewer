@@ -21,6 +21,7 @@ function handleSelect(index: number) {
     <button
       v-for="(entry, i) in entries"
       :key="entry"
+      :aria-pressed="activeIndex === i"
       class="px-2 py-1 rounded text-xs whitespace-nowrap transition"
       :class="
         activeIndex === i

@@ -80,6 +80,44 @@ describe("CodePanel", () => {
     wrapper.unmount();
   });
 
+  it("remeasures connector anchors when the workspace resizes a code pane", async () => {
+    let notifyResize!: (entries: { contentRect: { height: number } }[]) => void;
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: typeof notifyResize) {
+          notifyResize = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    await getSharedHighlighter({ langs: ["javascript"], themes: ["github-light"] });
+    const wrapper = mount(CodePanel, {
+      props: { code: "ab", filename: "example.js", side: "generated" },
+    });
+    await nextTick();
+    let left = 100;
+    let top = 80;
+    wrapper.get('[data-line="0"]').element.getBoundingClientRect = () =>
+      ({ top, bottom: top + 20, height: 20 }) as DOMRect;
+    const range = vi.spyOn(document, "createRange").mockReturnValue({
+      setStart() {},
+      setEnd() {},
+      getBoundingClientRect: () => ({ left }) as DOMRect,
+    } as unknown as Range);
+    try {
+      expect(wrapper.vm.getViewportPosition(0, 0)).toMatchObject({ x: 100, top: 80 });
+      left = 60;
+      top = 120;
+      notifyResize([{ contentRect: { height: 600 } }]);
+      expect(wrapper.vm.getViewportPosition(0, 0)).toMatchObject({ x: 60, top: 120 });
+    } finally {
+      range.mockRestore();
+      wrapper.unmount();
+    }
+  });
+
   it("keeps single-character mappings hoverable near their rendered span", async () => {
     await getSharedHighlighter({ langs: ["javascript"], themes: ["github-light"] });
     const store = useSourceMapStore();

@@ -265,56 +265,46 @@ function formatTimeAgo(timestamp: number): string {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-base px-4 py-6 sm:px-6">
+  <div class="landing-page">
     <FileDropZone @drop="handleFiles" />
 
-    <div class="w-full max-w-4xl space-y-8">
-      <div class="mx-auto w-full max-w-4xl space-y-6">
+    <div class="landing-content">
+      <div class="landing-primary">
         <!-- Header -->
-        <div class="mx-auto max-w-2xl text-center">
-          <div class="flex items-center justify-center gap-2 mb-1">
-            <img :src="'/logo.svg'" alt="Logo" class="h-8 w-8" />
-            <h1 class="text-4xl font-bold tracking-tight text-fg">
+        <div class="landing-heading">
+          <div class="landing-brand">
+            <img :src="'/logo.svg'" alt="Logo" class="h-6 w-6" />
+            <h1 class="landing-title">
               {{ APP_NAME }}
             </h1>
           </div>
-          <p class="text-base font-mono text-fg-muted">
+          <p class="landing-description">
             {{ APP_DESCRIPTION }}
           </p>
         </div>
 
         <!-- Error -->
-        <div
-          v-if="error"
-          class="rounded-lg bg-red-50 dark:bg-red-900/20 p-4 text-red-700 dark:text-red-400 text-sm"
-        >
+        <div v-if="error" class="landing-error">
           {{ error }}
         </div>
 
         <!-- Drop Zone -->
-        <div class="rounded-xl border-2 border-dashed border-edge bg-surface p-6 text-center">
-          <div class="mb-3 space-y-1">
-            <p class="text-sm text-fg-muted">
+        <div class="landing-input">
+          <div class="landing-input-copy">
+            <p class="text-sm text-fg-dim">
               Drop generated code, source maps, or a build folder here
             </p>
             <p class="text-xs text-fg-muted">
               Supports
-              <code class="font-mono bg-muted px-1.5 py-0.5 rounded">.js</code>,
-              <code class="font-mono bg-muted px-1.5 py-0.5 rounded">.ts</code>,
-              <code class="font-mono bg-muted px-1.5 py-0.5 rounded">.css</code>,
-              <code class="font-mono bg-muted px-1.5 py-0.5 rounded">.map</code>, and
-              <code class="font-mono bg-muted px-1.5 py-0.5 rounded">.json</code>
+              <code class="font-mono">.js</code>, <code class="font-mono">.ts</code>,
+              <code class="font-mono">.css</code>, <code class="font-mono">.map</code>, and
+              <code class="font-mono">.json</code>
             </p>
           </div>
-          <div class="flex flex-wrap items-center justify-center gap-2">
+          <div class="landing-input-actions">
             <div ref="uploadMenuRef" class="relative">
               <button
-                :class="[
-                  'flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm transition-all duration-150 focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/30 active:translate-y-px',
-                  showUploadMenu
-                    ? 'border-fg-muted bg-muted text-fg shadow-sm'
-                    : 'border-edge bg-surface text-fg-dim hover:border-fg-muted hover:bg-muted hover:text-fg active:border-fg active:bg-panel active:text-fg',
-                ]"
+                :class="['landing-action landing-action-primary', showUploadMenu ? 'is-open' : '']"
                 :aria-expanded="showUploadMenu"
                 @click="showUploadMenu = !showUploadMenu"
               >
@@ -325,23 +315,14 @@ function formatTimeAgo(timestamp: number): string {
                   :class="showUploadMenu ? 'rotate-180' : ''"
                 />
               </button>
-              <div
-                v-if="showUploadMenu"
-                class="absolute left-0 top-full z-10 mt-2 min-w-[13rem] rounded-lg border border-edge bg-panel p-1.5 shadow-lg"
-              >
-                <button
-                  class="block w-full rounded-md px-3 py-2 text-left transition-all duration-150 hover:bg-surface active:translate-y-px active:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-                  @click="selectUploadMode('files')"
-                >
+              <div v-if="showUploadMenu" class="landing-upload-menu">
+                <button class="landing-upload-option" @click="selectUploadMode('files')">
                   <span class="block text-sm text-fg">Files</span>
                   <span class="mt-0.5 block text-xs leading-tight text-fg-muted">
                     Pick individual generated files and source maps
                   </span>
                 </button>
-                <button
-                  class="block w-full rounded-md px-3 py-2 text-left transition-all duration-150 hover:bg-surface active:translate-y-px active:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-                  @click="selectUploadMode('folder')"
-                >
+                <button class="landing-upload-option" @click="selectUploadMode('folder')">
                   <span class="block text-sm text-fg">Folder</span>
                   <span class="mt-0.5 block text-xs leading-tight text-fg-muted">
                     Load every bundle in a build folder with its relative paths
@@ -350,7 +331,7 @@ function formatTimeAgo(timestamp: number): string {
               </div>
             </div>
             <button
-              class="flex items-center gap-1.5 rounded-lg border border-edge bg-surface px-4 py-2 text-sm text-fg-dim transition-all duration-150 hover:border-fg-muted hover:bg-muted hover:text-fg active:translate-y-px active:border-fg active:bg-panel active:text-fg focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/30"
+              class="landing-action"
               @click="
                 showPaste = !showPaste;
                 showUrl = false;
@@ -360,7 +341,7 @@ function formatTimeAgo(timestamp: number): string {
               Paste
             </button>
             <button
-              class="flex items-center gap-1.5 rounded-lg border border-edge bg-surface px-4 py-2 text-sm text-fg-dim transition-all duration-150 hover:border-fg-muted hover:bg-muted hover:text-fg active:translate-y-px active:border-fg active:bg-panel active:text-fg focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/30"
+              class="landing-action"
               @click="
                 showUrl = !showUrl;
                 showPaste = false;
@@ -373,20 +354,20 @@ function formatTimeAgo(timestamp: number): string {
         </div>
 
         <!-- Loading -->
-        <div v-if="loading" class="flex items-center justify-center gap-2 text-sm text-fg-muted">
+        <div v-if="loading" class="flex items-center gap-2 text-sm text-fg-muted">
           <IconCircleDash class="w-4 h-4 animate-spin" />
           Loading source map...
         </div>
 
         <!-- Paste panel -->
-        <div v-if="showPaste" class="space-y-2">
+        <div v-if="showPaste" class="landing-text-input">
           <textarea
             v-model="pasteContent"
-            class="w-full h-40 rounded-lg border border-edge bg-muted p-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="landing-field landing-paste-field"
             placeholder="Paste generated code with an inline sourceMappingURL, raw source map JSON, or a data:application/json... URL..."
           />
           <button
-            class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-150 hover:bg-blue-500 active:translate-y-px active:bg-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600 disabled:active:translate-y-0 disabled:active:bg-blue-600"
+            class="landing-action landing-action-primary"
             :disabled="!pasteContent || loading"
             @click="handlePaste"
           >
@@ -395,15 +376,15 @@ function formatTimeAgo(timestamp: number): string {
         </div>
 
         <!-- URL panel -->
-        <div v-if="showUrl" class="space-y-2">
+        <div v-if="showUrl" class="landing-text-input">
           <input
             v-model="urlInput"
-            class="w-full rounded-lg border border-edge bg-muted px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="landing-field"
             placeholder="https://cdn.example.com/bundle.min.js, .map, or data:application/json..."
             @keydown.enter="handleUrl"
           />
           <button
-            class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-150 hover:bg-blue-500 active:translate-y-px active:bg-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-600 disabled:active:translate-y-0 disabled:active:bg-blue-600"
+            class="landing-action landing-action-primary"
             :disabled="!urlInput || loading"
             @click="handleUrl"
           >
@@ -413,35 +394,24 @@ function formatTimeAgo(timestamp: number): string {
 
         <!-- Recent History: skeleton during SSR, real content on client -->
         <div v-if="historyLoading">
-          <span class="text-xs uppercase tracking-widest font-semibold text-fg-muted mb-2 block"
-            >Recent</span
-          >
-          <div class="space-y-1">
-            <div
-              v-for="i in 2"
-              :key="i"
-              class="w-full h-10 rounded-lg border border-edge bg-surface animate-pulse"
-            />
+          <span class="landing-section-title">Recent</span>
+          <div class="landing-history-list">
+            <div v-for="i in 2" :key="i" class="landing-history-skeleton animate-pulse" />
           </div>
         </div>
         <div v-else-if="historyEntries.length > 0">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs uppercase tracking-widest font-semibold text-fg-muted"
-              >Recent</span
-            >
-            <button
-              class="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-fg-muted transition-all duration-150 hover:bg-surface hover:text-fg-dim active:translate-y-px active:bg-muted active:text-fg-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-              @click="clearHistory"
-            >
+          <div class="landing-section-heading">
+            <span class="landing-section-title">Recent</span>
+            <button class="landing-clear" @click="clearHistory">
               <IconTrashCan class="w-3 h-3" />
               Clear
             </button>
           </div>
-          <div class="space-y-1">
+          <div class="landing-history-list">
             <button
               v-for="entry in historyEntries"
               :key="entry.slug"
-              class="w-full flex items-center justify-between rounded-lg border border-edge bg-surface px-3 py-2 text-left transition-all duration-150 hover:border-fg-muted hover:bg-muted active:translate-y-px active:border-fg active:bg-panel focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/30"
+              class="landing-history-row"
               @click="loadFromHistory(entry)"
             >
               <span class="font-mono text-sm text-fg-dim truncate">{{ entry.label }}</span>
@@ -454,27 +424,25 @@ function formatTimeAgo(timestamp: number): string {
       </div>
 
       <!-- Examples -->
-      <div class="mx-auto w-full max-w-4xl">
-        <span class="text-xs uppercase tracking-widest font-semibold text-fg-muted mb-2 block"
-          >Examples</span
-        >
-        <div class="grid gap-3 md:grid-cols-2">
+      <div class="landing-examples">
+        <span class="landing-section-title">Examples</span>
+        <div class="landing-example-list">
           <div
             v-for="source in exampleSources"
             :key="source.name"
             :data-example-name="source.name"
             :data-default-transformer="getDefaultTransformer(source)"
-            class="flex h-full cursor-pointer items-start gap-3 rounded-lg border border-edge bg-surface p-3 transition-all duration-150 hover:border-fg-muted hover:bg-muted active:translate-y-px active:border-fg active:bg-panel focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/30"
+            class="landing-example-row"
             role="button"
             tabindex="0"
             @click="loadDefaultExample(source)"
             @keydown.enter.prevent="loadDefaultExample(source)"
             @keydown.space.prevent="loadDefaultExample(source)"
           >
-            <ExamplePreview :code="getFirstGeneratedCode(source)" />
+            <ExamplePreview class="landing-example-preview" :code="getFirstGeneratedCode(source)" />
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-semibold text-fg">{{ source.name }}</p>
-              <p class="text-xs text-fg-muted mb-1.5">
+              <p class="text-sm font-medium text-fg">{{ source.name }}</p>
+              <p class="text-xs leading-relaxed text-fg-muted mt-1 mb-2">
                 {{ source.description }}
               </p>
               <div class="flex flex-wrap gap-1.5">
@@ -482,7 +450,7 @@ function formatTimeAgo(timestamp: number): string {
                   v-for="transformer in getOrderedTransformers(source)"
                   :key="transformer"
                   :data-transformer="transformer"
-                  class="rounded border border-transparent bg-muted px-2 py-0.5 text-xs font-mono text-fg-dim transition-all duration-150 hover:border-edge hover:bg-edge hover:text-fg active:translate-y-px active:bg-panel focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                  class="landing-transformer"
                   @click.stop="loadExample(source, transformer)"
                 >
                   {{ transformer }}
@@ -493,13 +461,11 @@ function formatTimeAgo(timestamp: number): string {
         </div>
       </div>
 
-      <div class="mx-auto w-full max-w-4xl space-y-6">
+      <div class="landing-support">
         <!-- How it works -->
         <div>
-          <span class="text-xs uppercase tracking-widest font-semibold text-fg-muted mb-2 block"
-            >How it works</span
-          >
-          <div class="space-y-1.5 text-sm text-fg-muted">
+          <span class="landing-section-title">How it works</span>
+          <div class="landing-instructions">
             <div class="flex items-baseline gap-2">
               <IconArrowRight class="w-3 h-3 shrink-0 mt-0.5 text-fg-muted" />
               <span
@@ -524,20 +490,15 @@ function formatTimeAgo(timestamp: number): string {
         </div>
 
         <!-- Compare -->
-        <a
-          href="/compare"
-          class="block rounded-xl border border-edge bg-surface p-4 hover:bg-muted transition"
-        >
-          <span class="text-sm font-semibold text-fg">Compare Source Maps</span>
+        <a href="/compare" class="landing-compare-link">
+          <span class="text-sm font-medium text-fg">Compare Source Maps</span>
           <p class="text-xs text-fg-muted mt-1">
             Diff two source maps to see which mappings changed, were added, or removed
           </p>
         </a>
 
         <!-- Footer -->
-        <div
-          class="border-t border-edge pt-4 flex items-center justify-between text-xs text-fg-muted"
-        >
+        <div class="landing-footer">
           <a
             href="https://github.com/Dunqing/source-map-viewer"
             target="_blank"
@@ -563,3 +524,355 @@ function formatTimeAgo(timestamp: number): string {
     </div>
   </div>
 </template>
+
+<style scoped>
+.landing-page {
+  --landing-accent: #246fc6;
+  min-height: 100dvh;
+  padding: 64px 24px 28px;
+  background: var(--c-bg);
+  color: var(--c-text);
+}
+
+.landing-content {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.landing-primary {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.landing-heading {
+  margin-bottom: 8px;
+}
+
+.landing-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.landing-title {
+  font-size: 26px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.7px;
+}
+
+.landing-description {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--c-text-3);
+}
+
+.landing-input {
+  padding: 30px;
+  border: 1px dashed var(--c-border);
+  border-radius: 5px;
+  background: var(--c-bg-soft);
+}
+
+.landing-input-copy > :first-child {
+  color: var(--c-text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.landing-input-copy > :last-child {
+  margin-top: 7px;
+  line-height: 1.7;
+}
+
+.landing-input-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.landing-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 1px solid var(--c-border);
+  border-radius: 4px;
+  background: var(--c-bg);
+  color: var(--c-text-2);
+  font-size: 13px;
+  line-height: 1.4;
+  transition:
+    background-color 120ms,
+    color 120ms,
+    border-color 120ms;
+}
+
+.landing-action:hover {
+  background: var(--c-bg-mute);
+  color: var(--c-text);
+}
+
+.landing-action-primary {
+  border-color: transparent;
+  background: var(--landing-accent);
+  color: #fff;
+}
+
+.landing-action-primary:hover,
+.landing-action-primary.is-open {
+  background: #1e62b0;
+  color: #fff;
+}
+
+.landing-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.landing-upload-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  width: min(280px, calc(100vw - 64px));
+  padding: 5px;
+  border: 1px solid var(--c-border);
+  border-radius: 5px;
+  background: var(--c-bg);
+  box-shadow: 0 8px 28px #10213614;
+}
+
+.landing-upload-option {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border-radius: 3px;
+  text-align: left;
+}
+
+.landing-upload-option:hover {
+  background: var(--c-bg-soft);
+}
+
+.landing-text-input {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.landing-field {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 4px;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.landing-field::placeholder {
+  color: var(--c-text-3);
+}
+
+.landing-paste-field {
+  height: 180px;
+  resize: none;
+}
+
+.landing-error {
+  padding: 12px 14px;
+  border-left: 2px solid var(--c-text-3);
+  background: var(--c-bg-soft);
+  color: var(--c-text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.landing-section-title {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--c-text-2);
+}
+
+.landing-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.landing-section-heading .landing-section-title {
+  margin-bottom: 0;
+}
+
+.landing-clear {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 0 5px 8px;
+  font-size: 12px;
+  color: var(--c-text-3);
+}
+
+.landing-clear:hover {
+  color: var(--c-text);
+}
+
+.landing-history-list,
+.landing-example-list {
+  border-top: 1px solid var(--c-border);
+}
+
+.landing-history-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--c-border);
+  text-align: left;
+  transition: background-color 120ms;
+}
+
+.landing-history-skeleton {
+  height: 44px;
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-bg-soft);
+}
+
+.landing-examples {
+  margin-top: 36px;
+}
+
+.landing-example-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--c-border);
+  cursor: pointer;
+  transition: background-color 120ms;
+}
+
+.landing-history-row:hover,
+.landing-example-row:hover {
+  background: var(--c-bg-soft);
+}
+
+.landing-example-preview {
+  opacity: 0.7;
+  filter: grayscale(1);
+}
+
+.landing-transformer {
+  padding: 3px 6px;
+  margin-left: -6px;
+  margin-right: 6px;
+  border-radius: 3px;
+  color: var(--c-text-2);
+  font-family: monospace;
+  font-size: 12px;
+  transition:
+    background-color 120ms,
+    color 120ms;
+}
+
+.landing-transformer:hover {
+  background: var(--c-bg-mute);
+  color: var(--landing-accent);
+}
+
+.landing-support {
+  margin-top: 32px;
+}
+
+.landing-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  color: var(--c-text-3);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.landing-compare-link {
+  display: block;
+  margin-top: 28px;
+  padding: 18px 0;
+  border-top: 1px solid var(--c-border);
+  transition: background-color 120ms;
+}
+
+.landing-compare-link:hover {
+  background: var(--c-bg-soft);
+}
+
+.landing-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--c-border);
+  color: var(--c-text-3);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.landing-footer > span {
+  font-family: inherit;
+}
+
+.landing-page :is(button, a, [role="button"], input, textarea):focus-visible {
+  outline: 2px solid var(--landing-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .landing-page {
+    padding: 32px 18px 24px;
+  }
+
+  .landing-title {
+    font-size: 23px;
+  }
+
+  .landing-input {
+    padding: 22px 18px;
+  }
+
+  .landing-example-row {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .landing-example-preview {
+    margin-top: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-page *,
+  .landing-page *::before,
+  .landing-page *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+</style>

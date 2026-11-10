@@ -120,10 +120,7 @@ defineExpose({ focusInput });
 </script>
 
 <template>
-  <section
-    aria-label="Position lookup"
-    class="shrink-0 border-b border-edge bg-surface px-3 py-3 text-xs"
-  >
+  <section aria-label="Position lookup" class="text-xs">
     <div class="mb-2 flex items-center justify-between gap-3">
       <h2 class="font-semibold text-fg">Find position</h2>
       <button
@@ -160,6 +157,7 @@ defineExpose({ focusInput });
           ref="inputRef"
           v-model="input"
           type="text"
+          autofocus
           required
           spellcheck="false"
           autocomplete="off"

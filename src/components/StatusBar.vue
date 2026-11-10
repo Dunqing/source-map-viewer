@@ -23,9 +23,9 @@ const statusText = computed(() => {
 </script>
 
 <template>
-  <div class="flex items-center px-4 py-1 border-t border-edge bg-surface text-xs text-fg-dim">
-    <span>{{ statusText }}</span>
-    <div class="flex-1" />
+  <footer class="workspace-footer text-fg-dim">
+    <span :title="statusText">{{ statusText }}</span>
+    <div class="footer-spacer" />
     <button
       v-if="store.stats"
       class="hover:text-blue-500 transition"
@@ -33,5 +33,5 @@ const statusText = computed(() => {
     >
       {{ store.stats.totalMappings }} mappings ▴
     </button>
-  </div>
+  </footer>
 </template>

@@ -441,6 +441,7 @@ onMounted(() => {
     resizeObserver = new ResizeObserver((entries) => {
       containerHeight.value = entries[0].contentRect.height;
       cachedCharWidth = 0; // re-measure on zoom/resize
+      positionCache.clear(); // layout changes move cached viewport coordinates
     });
     resizeObserver.observe(containerRef.value);
   }

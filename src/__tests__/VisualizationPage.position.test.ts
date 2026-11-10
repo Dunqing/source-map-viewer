@@ -66,6 +66,136 @@ afterEach(() => {
 });
 
 describe("viewer position lookup", () => {
+  it("keeps lookup alongside code and lets shortcuts refocus an already open search", async () => {
+    const wrapper = mount(VisualizationPage, { attachTo: document.body, global: { stubs } });
+    try {
+      await flushPromises();
+      await wrapper.find("#position-lookup-toggle").trigger("click");
+      const lookup = wrapper.findComponent(PositionLookupPanel);
+      await lookup.find("input").setValue("1:0");
+      await lookup.find("form").trigger("submit");
+      await flushPromises();
+      expect(lookup.element.closest("dialog")).toBeNull();
+      expect(lookup.text()).toContain("Exact mapping point");
+      const generated = wrapper
+        .findAllComponents(CodePanelStub)
+        .find((pane) => pane.props("side") === "generated")!;
+      generated.vm.$emit("segmentClick", useSourceMapStore().mappingIndex[0]);
+      await flushPromises();
+      expect(useSourceMapStore().hoveredSegment).not.toBeNull();
+      for (const key of ["f", "g", "f"]) {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key, ctrlKey: true, bubbles: true }));
+        await flushPromises();
+        expect(document.activeElement).toBe(
+          wrapper.find(
+            key === "g" ? "#position-lookup-panel input" : 'input[placeholder="Search..."]',
+          ).element,
+        );
+      }
+      const filesButton = wrapper.findAll("button").find((button) => button.text() === "Files")!;
+      filesButton.element.focus();
+      await filesButton.trigger("click");
+      await flushPromises();
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }),
+      );
+      await flushPromises();
+      expect(wrapper.find("dialog").attributes("open")).toBeUndefined();
+      expect(document.activeElement).toBe(wrapper.find('input[placeholder="Search..."]').element);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  it.each([true, false])(
+    "reveals code for lookup and search on a narrow viewport: %s",
+    async (narrow) => {
+      vi.stubGlobal("matchMedia", () => ({
+        matches: narrow,
+        addEventListener() {},
+        removeEventListener() {},
+      }));
+      const wrapper = mount(VisualizationPage, { global: { stubs } });
+      try {
+        await flushPromises();
+        const details = wrapper.findAll("button").find((button) => button.text() === "Details")!;
+        for (const key of ["g", "f"]) {
+          if (!wrapper.find(".workspace-side-panel").exists()) await details.trigger("click");
+          expect(wrapper.find(".workspace-side-panel").exists()).toBe(true);
+          document.dispatchEvent(
+            new KeyboardEvent("keydown", { key, ctrlKey: true, bubbles: true }),
+          );
+          await flushPromises();
+          expect(wrapper.find(".workspace-panes").classes().includes("has-details")).toBe(!narrow);
+        }
+      } finally {
+        wrapper.unmount();
+      }
+    },
+  );
+
+  it.each([true, false])(
+    "uses file metadata and returns to the selected file on a narrow viewport: %s",
+    async (narrow) => {
+      vi.stubGlobal("matchMedia", () => ({
+        matches: narrow,
+        addEventListener() {},
+        removeEventListener() {},
+      }));
+      const store = useSourceMapStore();
+      const entry = {
+        label: "Pasted code",
+        entryPath: "Pasted code",
+        generatedCode: "a{}",
+        sourceMapJson: JSON.stringify({
+          version: 3,
+          file: "output.css",
+          sources: ["a.scss", "b.scss"],
+          sourcesContent: ["a{}", "b{}"],
+          names: [],
+          mappings: "AAAA",
+        }),
+      };
+      store.loadSourceMapCollection([
+        entry,
+        { ...entry, label: "other.css", entryPath: "other.css", generatedPath: "dist/other.css" },
+      ]);
+      const wrapper = mount(VisualizationPage, {
+        global: { stubs: { ...stubs, SourceTabs: false } },
+      });
+      try {
+        await flushPromises();
+        const generated = wrapper
+          .findAllComponents(CodePanelStub)
+          .find((pane) => pane.props("side") === "generated")!;
+        expect(generated.props("filename")).toBe("output.css");
+        const details = wrapper.findAll("button").find((button) => button.text() === "Details")!;
+        await details.trigger("click");
+        const filesButton = wrapper.findAll("button").find((button) => button.text() === "Files")!;
+        await filesButton.trigger("click");
+        await flushPromises();
+        const files = wrapper.find("dialog");
+        expect(files.text()).toContain("Source map path is not available.");
+        expect(files.text()).not.toContain("Pasted code.map");
+        await files.findAll(".file-list").at(-1)!.findAll("button")[1]!.trigger("click");
+        await flushPromises();
+        expect(store.activeSourceIndex).toBe(1);
+        expect(files.attributes("open")).toBeUndefined();
+        expect(wrapper.find(".workspace-panes").classes().includes("has-details")).toBe(!narrow);
+        if (!wrapper.find(".workspace-side-panel").exists()) await details.trigger("click");
+        await filesButton.trigger("click");
+        await flushPromises();
+        await files.find(".file-list").findAll("button")[1]!.trigger("click");
+        await flushPromises();
+        expect(store.activeGeneratedEntryIndex).toBe(1);
+        expect(generated.props("filename")).toBe("dist/other.css");
+        expect(files.attributes("open")).toBeUndefined();
+        expect(wrapper.find(".workspace-panes").classes().includes("has-details")).toBe(!narrow);
+      } finally {
+        wrapper.unmount();
+      }
+    },
+  );
   it("restores an unmapped requested position instead of the selected mapping", async () => {
     window.history.replaceState(null, "", "/demo?pos=generated%3A1%3A7&seg=0");
     const wrapper = mount(VisualizationPage, { global: { stubs } });

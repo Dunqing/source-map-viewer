@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import "@unocss/reset/tailwind.css";
 import "virtual:uno.css";
+import "../src/styles/workspace.css";
 
 const jsonLd = JSON.stringify({
   "@context": "https://schema.org",
@@ -64,6 +65,7 @@ body {
   margin: 0;
   background: var(--c-bg);
   color: var(--c-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 /* Hide the landing page before a shared-link slug resolves on the client.
    The head script adds .has-share-slug before paint. Vue removes it after mount. */
@@ -76,14 +78,14 @@ html.has-share-slug #app {
    Components use semantic UnoCSS classes (bg-base, text-fg, etc.)
    that reference these variables — no dark: prefixes needed. */
 :root {
-  --c-bg: #f8fafc;
-  --c-bg-soft: #f1f5f9;
-  --c-bg-mute: #e8eef4;
-  --c-bg-emphasis: #dce4ee;
-  --c-text: #0f172a;
-  --c-text-2: #334155;
-  --c-text-3: #64748b;
-  --c-border: #d8e0ea;
+  --c-bg: #ffffff;
+  --c-bg-soft: #fafbfc;
+  --c-bg-mute: #f2f4f7;
+  --c-bg-emphasis: #e7edf4;
+  --c-text: #242b36;
+  --c-text-2: #4e5969;
+  --c-text-3: #626e7f;
+  --c-border: #e6e9ee;
 
   --seg-0: #dbe4f0;
   --seg-1: #f0ddd2;
@@ -101,14 +103,14 @@ html.has-share-slug #app {
   --connector-suspicious-bg: rgba(245, 158, 11, 0.12);
 }
 html.dark {
-  --c-bg: #1a1a1e;
-  --c-bg-soft: #1e1e22;
-  --c-bg-mute: #2a2a2e;
-  --c-bg-emphasis: #36363a;
-  --c-text: #fafafa;
-  --c-text-2: #a1a1aa;
-  --c-text-3: #a0a0ab;
-  --c-border: #36363a;
+  --c-bg: #202630;
+  --c-bg-soft: #252d39;
+  --c-bg-mute: #2c3542;
+  --c-bg-emphasis: #354253;
+  --c-text: #e3e9f2;
+  --c-text-2: #c0cad8;
+  --c-text-3: #acb9cb;
+  --c-border: #384352;
 
   --seg-0: #30425a;
   --seg-1: #544038;

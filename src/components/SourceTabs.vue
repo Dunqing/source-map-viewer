@@ -2,6 +2,12 @@
 import { useSourceMapStore } from "../stores/sourceMap";
 
 const store = useSourceMapStore();
+const emit = defineEmits<{ select: [index: number] }>();
+
+function selectSource(index: number) {
+  store.setActiveSource(index);
+  emit("select", index);
+}
 </script>
 
 <template>
@@ -9,13 +15,14 @@ const store = useSourceMapStore();
     <button
       v-for="(source, i) in store.parsedData?.sources ?? []"
       :key="i"
+      :aria-pressed="store.activeSourceIndex === i"
       class="px-2 py-1 rounded text-xs whitespace-nowrap transition"
       :class="
         store.activeSourceIndex === i
           ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
           : 'hover:bg-surface text-fg-dim'
       "
-      @click="store.setActiveSource(i)"
+      @click="selectSource(i)"
     >
       {{ source }}
     </button>

@@ -1,11 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { replaceCurrentPath } from "../composables/navigation";
-import IconArrowLeft from "~icons/carbon/arrow-left";
-import IconLogoGithub from "~icons/carbon/logo-github";
-import IconSun from "~icons/carbon/sun";
-import IconMoon from "~icons/carbon/moon";
-import IconScreen from "~icons/carbon/screen";
+import Toolbar from "../components/Toolbar.vue";
+import WorkspaceDialog from "../components/WorkspaceDialog.vue";
 import { parseSourceMap } from "../core/parser";
 import { buildMappingIndex } from "../core/mapper";
 import { validateMappings } from "../core/validator";
@@ -16,15 +13,14 @@ import PatternSummary from "../components/PatternSummary.vue";
 import CompareCodePane from "../components/CompareCodePane.vue";
 import { provideCrossPaneHover } from "../composables/useCrossPaneHover";
 import { provideCrossPaneScroll } from "../composables/useCrossPaneScroll";
-import { useTheme } from "../composables/useTheme";
-import { APP_NAME, LINE_HEIGHT } from "../constants";
+import { LINE_HEIGHT } from "../constants";
 
-const { theme, toggleTheme } = useTheme();
-const themeTitle = {
-  light: "Light mode (click for dark)",
-  dark: "Dark mode (click for system)",
-  system: "System mode (click for light)",
-} as const;
+const showFiles = ref(false);
+const showDetails = ref(false);
+
+function handleOpen() {
+  window.location.href = "/";
+}
 
 // Shared "which source position is currently hovered" ref, scoped to the
 // compare page subtree. Both `CompareCodePane` instances read/write here
@@ -62,26 +58,35 @@ interface CompareUrlState {
 }
 
 function readCompareUrlState(): CompareUrlState {
-  if (typeof window === "undefined") return { tab: "table", ignoreSourceName: true };
+  if (typeof window === "undefined") return { tab: "code", ignoreSourceName: true };
   const params = new URLSearchParams(window.location.search);
   const tabRaw = params.get(TAB_PARAM);
-  const tab: CompareTab = tabRaw === "code" || tabRaw === "table" ? tabRaw : "table";
+  const defaultTab: CompareTab = window.matchMedia("(max-width: 680px)").matches ? "table" : "code";
+  const tab: CompareTab = tabRaw === "code" || tabRaw === "table" ? tabRaw : defaultTab;
   const ignoreSourceName = params.get(IGNORE_NAME_PARAM) !== "0";
   return { tab, ignoreSourceName };
 }
 
-const initialUrlState = readCompareUrlState();
-const ignoreSourceName = ref(initialUrlState.ignoreSourceName);
-const activeTab = ref<CompareTab>(initialUrlState.tab);
+const ignoreSourceName = ref(true);
+const activeTab = ref<CompareTab>("code");
+function selectTab(tab: CompareTab) {
+  activeTab.value = tab;
+  if (window.matchMedia("(max-width: 680px)").matches) showDetails.value = false;
+}
+const urlStateReady = ref(false);
+onMounted(() => {
+  const state = readCompareUrlState();
+  ignoreSourceName.value = state.ignoreSourceName;
+  activeTab.value = state.tab;
+  urlStateReady.value = true;
+});
 
-// `watch` is lazy by default — it only fires on changes after setup, so
-// the initial assignment from URL doesn't stomp params, and nothing else
-// here mutates these refs during mount.
+// Persist explicit choices so a code view shared from a phone also opens
+// as code on desktop, and vice versa. Viewport defaults apply only on load.
 watch([activeTab, ignoreSourceName], () => {
-  if (typeof window === "undefined") return;
+  if (!urlStateReady.value) return;
   const params = new URLSearchParams(window.location.search);
-  if (activeTab.value === "code") params.set(TAB_PARAM, "code");
-  else params.delete(TAB_PARAM);
+  params.set(TAB_PARAM, activeTab.value);
   if (!ignoreSourceName.value) params.set(IGNORE_NAME_PARAM, "0");
   else params.delete(IGNORE_NAME_PARAM);
   const search = params.toString();
@@ -124,6 +129,10 @@ const hasDuplicates = computed(() => duplicateSides.value.some(({ groups }) => g
 
 const diagnosticsA = computed(() => validateMappings(parsedA.value));
 const diagnosticsB = computed(() => validateMappings(parsedB.value));
+const issueCount = computed(() => diagnosticsA.value.length + diagnosticsB.value.length);
+const duplicatePositionCount = computed(() =>
+  duplicateSides.value.reduce((count, side) => count + side.groups.length, 0),
+);
 
 const diffResult = computed(() =>
   // Semantic comparison uses every raw occurrence, independently of which
@@ -262,15 +271,9 @@ function formatBreakdown(b: DiffBreakdown): string | null {
 const diffTableCount = computed(
   () => visibleEntries.value.filter((e) => e.status !== "same").length,
 );
-const codePanesCount = computed(() => Math.max(lineStatusesA.value.size, lineStatusesB.value.size));
 
-/**
- * Each Code-pane row's natural height is `max(generated lines, longest
- * source's lines) * LINE_HEIGHT` plus chrome (header + border + the
- * SourceTabs strip when there are multiple sources). Cap at half the
- * viewport so large files still scroll inside a bounded box.
- */
-const PANE_CHROME = 56;
+/** Include the entry heading, filename header, and borders in each row. */
+const PANE_CHROME = 64;
 
 function paneNaturalHeight(genLines: string[], origLines: string[][]): number {
   const longestSource = origLines.reduce((max, lines) => Math.max(max, lines.length), 0);
@@ -279,19 +282,14 @@ function paneNaturalHeight(genLines: string[], origLines: string[][]): number {
 }
 
 const paneHeightA = computed(
-  () => `min(${paneNaturalHeight(genLinesA.value, origLinesA.value)}px, calc(50vh - 24px))`,
+  () => `min(${paneNaturalHeight(genLinesA.value, origLinesA.value)}px, calc(50dvh - 56px))`,
 );
 const paneHeightB = computed(
-  () => `min(${paneNaturalHeight(genLinesB.value, origLinesB.value)}px, calc(50vh - 24px))`,
+  () => `min(${paneNaturalHeight(genLinesB.value, origLinesB.value)}px, calc(50dvh - 56px))`,
 );
 
 function viewerHref(slug?: string): string | null {
   return slug ? `/${slug}` : null;
-}
-
-function displayId(slug: string | undefined, fallback: string): string {
-  if (!slug) return fallback;
-  return slug.length > 12 ? `${slug.slice(0, 12)}...` : slug;
 }
 
 /**
@@ -316,279 +314,353 @@ function paneLabel(
 </script>
 
 <template>
-  <div class="min-h-screen bg-base">
-    <!-- Header — same chrome as `Toolbar.vue` for visual consistency with
-         the main viewer: single-row, bg-surface, border-b, with the logo
-         on the left and the theme/GitHub icons on the right. The compare-
-         specific bits (A/B chips and "Ignore source filename" toggle) sit
-         in the middle. -->
-    <div class="flex items-center gap-1.5 px-3 py-1.5 border-b border-edge bg-surface">
-      <a
-        href="/"
-        class="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition mr-1"
-        title="Back to home"
+  <div class="workspace-shell">
+    <Toolbar
+      mode="compare"
+      :inspect-href="viewerHref(slugA) || '/'"
+      :show-stats="showDetails"
+      :show-files="showFiles"
+      @home="handleOpen"
+      @files="showFiles = true"
+      @update:show-stats="showDetails = $event"
+    >
+      <template #options>
+        <label title="Match source coordinates even when source filenames differ"
+          ><input v-model="ignoreSourceName" type="checkbox" />Ignore source filename</label
+        >
+      </template>
+    </Toolbar>
+    <WorkspaceDialog
+      :open="showFiles"
+      label="Comparison files"
+      title="Files"
+      @close="showFiles = false"
+    >
+      <section
+        v-for="side in [
+          { key: 'A', entry: entryA, slug: slugA, data: parsedA },
+          { key: 'B', entry: entryB, slug: slugB, data: parsedB },
+        ]"
+        :key="side.key"
+        class="mb-6 last:mb-0"
       >
-        <IconArrowLeft class="w-4 h-4 text-fg-muted" />
-        <img :src="'/logo.svg'" alt="Logo" class="h-5 w-5" />
-        <span class="text-sm font-semibold text-fg">{{ APP_NAME }}</span>
-      </a>
-      <span class="text-xs text-fg-muted ml-1">Compare</span>
-      <div class="w-px h-4 bg-edge mx-1" />
-      <div
-        class="inline-flex items-center gap-2 rounded-full border border-edge bg-base px-2.5 py-0.5 min-w-0 text-xs"
-      >
-        <span class="font-semibold text-fg-dim shrink-0">A</span>
+        <h3 class="file-heading">{{ side.key === "A" ? "A · Reference" : "B · Candidate" }}</h3>
         <a
-          v-if="viewerHref(slugA)"
-          :href="viewerHref(slugA)!"
+          v-if="viewerHref(side.slug)"
+          :href="viewerHref(side.slug)!"
           target="_blank"
           rel="noreferrer"
-          class="font-mono text-fg hover:text-fg-dim underline decoration-dotted truncate"
+          class="text-sm underline underline-offset-4"
+          >{{ paneLabel(side.data.file, side.slug, side.entry.label) }}</a
         >
-          {{ displayId(slugA, entryA.label) }}
-        </a>
-        <span v-else class="font-mono text-fg truncate">{{ entryA.label }}</span>
-        <span class="text-fg-muted shrink-0">
-          {{ indexA.length }} raw mappings<template v-if="diagnosticsA.length"
-            >,
-            <span class="text-amber-600 dark:text-amber-400"
-              >{{ diagnosticsA.length }} issues</span
-            ></template
-          >
-        </span>
-      </div>
-      <div
-        class="inline-flex items-center gap-2 rounded-full border border-edge bg-base px-2.5 py-0.5 min-w-0 text-xs"
-      >
-        <span class="font-semibold text-fg-dim shrink-0">B</span>
-        <a
-          v-if="viewerHref(slugB)"
-          :href="viewerHref(slugB)!"
-          target="_blank"
-          rel="noreferrer"
-          class="font-mono text-fg hover:text-fg-dim underline decoration-dotted truncate"
-        >
-          {{ displayId(slugB, entryB.label) }}
-        </a>
-        <span v-else class="font-mono text-fg truncate">{{ entryB.label }}</span>
-        <span class="text-fg-muted shrink-0">
-          {{ indexB.length }} raw mappings<template v-if="diagnosticsB.length"
-            >,
-            <span class="text-amber-600 dark:text-amber-400"
-              >{{ diagnosticsB.length }} issues</span
-            ></template
-          >
-        </span>
-      </div>
-      <div class="flex-1" />
-      <label
-        class="inline-flex items-center gap-1.5 cursor-pointer text-fg-muted hover:text-fg-dim text-xs"
-        title="Treat segments as the same when only their source filename differs (e.g. before.js vs after.js for the same logical input)"
-      >
-        <input v-model="ignoreSourceName" type="checkbox" class="rounded" />
-        Ignore source filename
-      </label>
-      <div class="w-px h-4 bg-edge mx-1" />
-      <a
-        href="https://github.com/Dunqing/source-map-viewer"
-        target="_blank"
-        rel="noopener"
-        class="p-1.5 rounded text-fg-muted hover:text-fg-dim hover:bg-muted transition"
-        title="GitHub"
-      >
-        <IconLogoGithub class="w-4 h-4" />
-      </a>
-      <button
-        class="p-1.5 rounded text-fg-muted hover:text-fg-dim hover:bg-muted transition"
-        :title="themeTitle[theme]"
-        @click="toggleTheme"
-      >
-        <IconMoon v-if="theme === 'light'" class="w-4 h-4" />
-        <IconSun v-else-if="theme === 'dark'" class="w-4 h-4" />
-        <IconScreen v-else class="w-4 h-4" />
-      </button>
-    </div>
+        <p v-else class="text-sm">{{ paneLabel(side.data.file, side.slug, side.entry.label) }}</p>
+        <ul class="mt-3 space-y-2 text-xs text-fg-muted">
+          <li v-for="source in side.data.sources" :key="source" class="break-all">{{ source }}</li>
+        </ul>
+      </section>
+    </WorkspaceDialog>
 
-    <!-- Tabs + (Diff table | Code panes). PatternSummary has been moved
-         inside the Diff table panel since pattern selection only filters
-         the table — the Code panes view ignored the filter anyway. -->
-    <div class="max-w-6xl mx-auto p-4">
-      <details
-        v-if="hasDuplicates"
-        class="mb-3 rounded-lg border border-edge bg-surface px-3 py-2 text-xs text-fg-dim"
-      >
-        <summary class="cursor-pointer font-semibold">
-          Duplicate generated positions
-          <span v-for="side in duplicateSides" :key="side.side" class="ml-2 font-mono">
-            {{ side.side }}: {{ side.groups.length }}
-          </span>
-        </summary>
-        <p class="mt-2 text-fg-muted">
-          Multiple mappings share a generated position. All occurrences are compared; code
-          highlighting may show only one target. Positions use 1-based lines and 0-based columns.
-        </p>
-        <div v-for="side in duplicateSides" :key="side.side">
-          <div
-            v-for="group in side.groups"
-            :key="`${group[0].generatedLine}:${group[0].generatedColumn}`"
-            class="mt-2 font-mono"
+    <div v-if="urlStateReady" class="compare-context" aria-label="Comparison status">
+      <span>{{ ignoreSourceName ? "Source filenames ignored" : "Source filenames matched" }}</span>
+      <div class="compare-warnings">
+        <button v-if="issueCount" type="button" @click="showDetails = true">
+          ⚠ {{ issueCount }} issue{{ issueCount === 1 ? "" : "s" }}
+        </button>
+        <button v-if="duplicatePositionCount" type="button" @click="showDetails = true">
+          ⚠ {{ duplicatePositionCount }} duplicate position{{
+            duplicatePositionCount === 1 ? "" : "s"
+          }}
+        </button>
+      </div>
+    </div>
+    <main v-if="urlStateReady" class="compare-workspace" :class="{ 'show-details': showDetails }">
+      <section class="compare-main" aria-label="Source map comparison">
+        <div v-show="activeTab === 'table'" class="compare-table-view">
+          <PatternSummary
+            :patterns="patterns"
+            :selected-pattern-key="selectedPatternKey"
+            @select="handlePatternSelect"
+          />
+          <MappingDiffTable
+            :ignore-source-name="ignoreSourceName"
+            :entries="diffResult.entries"
+            :summary="diffResult.summary"
+            :sources-a="parsedA.sources"
+            :sources-b="parsedB.sources"
+            :names-a="parsedA.names"
+            :names-b="parsedB.names"
+            :gen-lines-a="genLinesA"
+            :gen-lines-b="genLinesB"
+            :orig-lines-a="origLinesA"
+            :orig-lines-b="origLinesB"
+            :raw-mappings-a="indexA"
+            :raw-mappings-b="indexB"
+            :filter-entries="filterEntries"
+          />
+        </div>
+        <div v-if="activeTab === 'code' && heavyViewBlocked" class="compare-large-file">
+          <h2>Large code view</h2>
+          <p>
+            This file has {{ totalGenLines.toLocaleString() }} lines. The diff table is available
+            without rendering every line of code.
+          </p>
+          <div class="flex gap-3 mt-4">
+            <button class="workspace-button" @click="activeTab = 'table'">Open diff table</button
+            ><button class="workspace-button" @click="heavyViewBypassed = true">
+              Load code anyway
+            </button>
+          </div>
+        </div>
+        <div v-if="activeTab === 'code' && !heavyViewBlocked" class="compare-code-view">
+          <section
+            class="compare-entry"
+            :style="{ height: paneHeightA }"
+            aria-label="A reference code"
           >
-            <div class="font-semibold">
-              {{ side.side }} · Generated {{ group[0].generatedLine + 1 }}:{{
-                group[0].generatedColumn
-              }}
-              · {{ group.length }} mappings
+            <header class="compare-entry-heading">
+              <strong>A</strong><span>{{ paneLabel(parsedA.file, slugA, entryA.label) }}</span
+              ><small>Reference</small>
+            </header>
+            <CompareCodePane
+              class="flex-1 min-h-0"
+              :generated-code="entryA.generatedCode"
+              :source-map-json="entryA.sourceMapJson"
+              :filename="parsedA.file ?? entryA.label"
+              :gen-line-statuses="lineStatusesA"
+              side="a"
+              :entries="diffResult.entries"
+            />
+          </section>
+          <section
+            class="compare-entry"
+            :style="{ height: paneHeightB }"
+            aria-label="B candidate code"
+          >
+            <header class="compare-entry-heading">
+              <strong>B</strong><span>{{ paneLabel(parsedB.file, slugB, entryB.label) }}</span
+              ><small>Candidate</small>
+            </header>
+            <CompareCodePane
+              class="flex-1 min-h-0"
+              :generated-code="entryB.generatedCode"
+              :source-map-json="entryB.sourceMapJson"
+              :filename="parsedB.file ?? entryB.label"
+              :gen-line-statuses="lineStatusesB"
+              side="b"
+              :entries="diffResult.entries"
+            />
+          </section>
+        </div>
+      </section>
+      <aside
+        v-show="showDetails"
+        class="workspace-side-panel compare-details"
+        aria-label="Comparison details"
+      >
+        <header class="workspace-side-heading">
+          <h2>Details</h2>
+          <button class="workspace-icon" aria-label="Close details" @click="showDetails = false">
+            ×
+          </button>
+        </header>
+        <div class="p-4 text-xs text-fg-dim space-y-4">
+          <section>
+            <h3 class="font-medium mb-2">A · Reference</h3>
+            <p>
+              {{ indexA.length }} raw mappings<span v-if="diagnosticsA.length"
+                >, {{ diagnosticsA.length }} issues</span
+              >
+            </p>
+            <p v-if="formatBreakdown(breakdownA)" class="text-fg-muted mt-1">
+              {{ formatBreakdown(breakdownA) }}
+            </p>
+          </section>
+          <section>
+            <h3 class="font-medium mb-2">B · Candidate</h3>
+            <p>
+              {{ indexB.length }} raw mappings<span v-if="diagnosticsB.length"
+                >, {{ diagnosticsB.length }} issues</span
+              >
+            </p>
+            <p v-if="formatBreakdown(breakdownB)" class="text-fg-muted mt-1">
+              {{ formatBreakdown(breakdownB) }}
+            </p>
+          </section>
+          <details v-if="hasDuplicates">
+            <summary class="cursor-pointer font-medium">
+              Duplicate generated positions{{ " "
+              }}<span v-for="side in duplicateSides" :key="side.side" class="ml-2 font-mono"
+                >{{ side.side }}: {{ side.groups.length }}</span
+              >
+            </summary>
+            <p class="mt-3 text-fg-muted">
+              All occurrences are compared; code highlighting may show one target. Lines start at 1,
+              columns at 0.
+            </p>
+            <div v-for="side in duplicateSides" :key="side.side">
+              <div
+                v-for="group in side.groups"
+                :key="`${group[0].generatedLine}:${group[0].generatedColumn}`"
+                class="mt-3 font-mono"
+              >
+                <div>
+                  {{ side.side }} · Generated {{ group[0].generatedLine + 1 }}:{{
+                    group[0].generatedColumn
+                  }}
+                  · {{ group.length }} mappings
+                </div>
+                <ol class="list-decimal pl-5 mt-1">
+                  <li v-for="(mapping, i) in group" :key="i">
+                    {{
+                      normalizeSourceName(
+                        side.sources[mapping.sourceIndex] ?? `#${mapping.sourceIndex}`,
+                      )
+                    }}:{{ mapping.originalLine + 1 }}:{{ mapping.originalColumn
+                    }}<span v-if="mapping.nameIndex !== null">
+                      · name: {{ side.names[mapping.nameIndex] ?? `#${mapping.nameIndex}` }}</span
+                    >
+                  </li>
+                </ol>
+              </div>
             </div>
-            <ol class="list-decimal pl-5 mt-1">
-              <li v-for="(mapping, i) in group" :key="i">
-                {{
-                  normalizeSourceName(
-                    side.sources[mapping.sourceIndex] ?? `#${mapping.sourceIndex}`,
-                  )
-                }}:{{ mapping.originalLine + 1 }}:{{ mapping.originalColumn }}
-                <span v-if="mapping.nameIndex !== null">
-                  · name: {{ side.names[mapping.nameIndex] ?? `#${mapping.nameIndex}` }}
-                </span>
-              </li>
-            </ol>
-          </div>
+          </details>
         </div>
-      </details>
-      <!-- Tab switcher: same button-bar pattern as EntrypointTabs.vue -->
-      <div
-        class="flex items-center gap-2 px-2 py-1 mb-3 rounded-lg border border-edge bg-muted overflow-x-auto"
+      </aside>
+    </main>
+    <footer class="workspace-footer">
+      <span class="text-fg-muted"
+        >{{ diffTableCount }} mapping difference{{ diffTableCount === 1 ? "" : "s" }}</span
       >
-        <span
-          class="shrink-0 pl-1 text-[11px] font-semibold uppercase tracking-widest text-fg-muted"
-        >
-          View
-        </span>
+      <div class="footer-spacer" />
+      <nav class="compare-view-tabs" aria-label="Comparison view">
         <button
-          v-for="tab in ['table', 'code'] as CompareTab[]"
+          v-for="tab in ['code', 'table'] as CompareTab[]"
           :key="tab"
-          class="px-2 py-1 rounded text-xs whitespace-nowrap transition flex items-center gap-1.5"
-          :class="
-            activeTab === tab
-              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
-              : 'hover:bg-surface text-fg-dim'
-          "
-          @click="activeTab = tab"
+          :aria-pressed="activeTab === tab"
+          @click="selectTab(tab)"
         >
-          <span>{{ tab === "table" ? "Diff table" : "Code panes" }}</span>
-          <span
-            v-if="tab === 'table' && diffTableCount > 0"
-            class="rounded-full bg-base border border-edge px-1.5 py-0.5 text-[10px] font-mono leading-none text-fg-muted"
-          >
-            {{ diffTableCount }}
-          </span>
-          <span
-            v-else-if="tab === 'code' && codePanesCount > 0"
-            class="rounded-full bg-base border border-edge px-1.5 py-0.5 text-[10px] font-mono leading-none text-fg-muted"
-          >
-            {{ codePanesCount }}
-          </span>
+          {{ tab === "table" ? "Diff table" : "Code panes" }}
         </button>
-      </div>
-
-      <div v-show="activeTab === 'table'">
-        <PatternSummary
-          :patterns="patterns"
-          :selected-pattern-key="selectedPatternKey"
-          @select="handlePatternSelect"
-        />
-        <MappingDiffTable
-          :ignore-source-name="ignoreSourceName"
-          :entries="diffResult.entries"
-          :summary="diffResult.summary"
-          :sources-a="parsedA.sources"
-          :sources-b="parsedB.sources"
-          :names-a="parsedA.names"
-          :names-b="parsedB.names"
-          :gen-lines-a="genLinesA"
-          :gen-lines-b="genLinesB"
-          :orig-lines-a="origLinesA"
-          :orig-lines-b="origLinesB"
-          :raw-mappings-a="indexA"
-          :raw-mappings-b="indexB"
-          :filter-entries="filterEntries"
-        />
-      </div>
-
-      <!-- Heavy-view bypass prompt for large files. -->
-      <div
-        v-if="activeTab === 'code' && heavyViewBlocked"
-        class="rounded border border-edge bg-surface px-3 py-3 text-xs flex items-start gap-3 flex-wrap"
-      >
-        <div class="flex flex-col gap-1 min-w-0 flex-1">
-          <span class="font-semibold text-fg">Heads up — large file</span>
-          <span class="text-fg-dim">
-            This view renders every line of generated code as DOM. The current file has
-            {{ totalGenLines }} lines, above the {{ HEAVY_VIEW_LINE_LIMIT }}-line cap, so loading it
-            could freeze your browser. Use the Diff table tab for large inputs, or click below to
-            load anyway.
-          </span>
-        </div>
-        <button
-          type="button"
-          class="shrink-0 rounded bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-medium"
-          @click="heavyViewBypassed = true"
-        >
-          Load anyway
-        </button>
-      </div>
-
-      <!-- A and B stack vertically: each gets full page width so the inner
-           source/generated split is readable. Per-pane natural height (with
-           a half-viewport cap) so small fixtures don't sit with a void
-           below them and large files still scroll inside a bounded box. -->
-      <div v-if="activeTab === 'code' && !heavyViewBlocked" class="flex flex-col gap-2">
-        <div
-          :style="{ height: paneHeightA }"
-          class="rounded border border-edge bg-surface overflow-hidden flex flex-col min-h-0"
-        >
-          <div
-            class="px-3 py-2 border-b border-edge bg-muted text-xs font-mono shrink-0 flex items-center gap-2"
-          >
-            <span class="text-[11px] font-semibold uppercase tracking-widest text-fg-muted">A</span>
-            <span class="text-fg truncate">{{ paneLabel(parsedA.file, slugA, entryA.label) }}</span>
-            <span v-if="formatBreakdown(breakdownA)" class="text-fg-muted truncate">
-              · {{ formatBreakdown(breakdownA) }}
-            </span>
-          </div>
-          <CompareCodePane
-            class="flex-1 min-h-0"
-            :generated-code="entryA.generatedCode"
-            :source-map-json="entryA.sourceMapJson"
-            :filename="parsedA.file ?? entryA.label"
-            :gen-line-statuses="lineStatusesA"
-            side="a"
-            :entries="diffResult.entries"
-          />
-        </div>
-        <div
-          :style="{ height: paneHeightB }"
-          class="rounded border border-edge bg-surface overflow-hidden flex flex-col min-h-0"
-        >
-          <div
-            class="px-3 py-2 border-b border-edge bg-muted text-xs font-mono shrink-0 flex items-center gap-2"
-          >
-            <span class="text-[11px] font-semibold uppercase tracking-widest text-fg-muted">B</span>
-            <span class="text-fg truncate">{{ paneLabel(parsedB.file, slugB, entryB.label) }}</span>
-            <span v-if="formatBreakdown(breakdownB)" class="text-fg-muted truncate">
-              · {{ formatBreakdown(breakdownB) }}
-            </span>
-          </div>
-          <CompareCodePane
-            class="flex-1 min-h-0"
-            :generated-code="entryB.generatedCode"
-            :source-map-json="entryB.sourceMapJson"
-            :filename="parsedB.file ?? entryB.label"
-            :gen-line-statuses="lineStatusesB"
-            side="b"
-            :entries="diffResult.entries"
-          />
-        </div>
-      </div>
-    </div>
+      </nav>
+    </footer>
   </div>
 </template>
+
+<style scoped>
+.compare-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 16px;
+  min-height: 28px;
+  padding: 4px 22px;
+  border-bottom: 1px solid var(--c-border);
+  color: var(--c-text-3);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.compare-warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--c-text);
+}
+.compare-warnings button:hover {
+  text-decoration: underline;
+}
+.compare-workspace {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+.compare-main {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+.compare-table-view {
+  padding: 20px;
+}
+.compare-code-view {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.compare-entry {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.compare-entry + .compare-entry {
+  border-top: 1px solid var(--c-border);
+}
+.compare-entry-heading {
+  height: 28px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 0 22px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.compare-entry-heading strong {
+  font-size: 11px;
+  color: var(--c-text-3);
+}
+.compare-entry-heading span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compare-entry-heading small {
+  margin-left: auto;
+  color: var(--c-text-3);
+  font-size: 11px;
+}
+.compare-large-file {
+  padding: 35px;
+  max-width: 640px;
+  font-size: 13px;
+}
+.compare-large-file h2 {
+  font-weight: 550;
+  margin-bottom: 10px;
+}
+.compare-large-file p {
+  color: var(--c-text-3);
+}
+.compare-view-tabs {
+  display: flex;
+  gap: 14px;
+}
+.compare-view-tabs button {
+  padding: 4px 0;
+}
+.compare-view-tabs button[aria-pressed="true"] {
+  color: var(--c-text);
+}
+@media (max-width: 680px) {
+  .compare-entry {
+    min-height: 420px;
+  }
+  .compare-context {
+    padding: 6px 14px;
+  }
+  .compare-workspace.show-details > .compare-main {
+    display: none;
+  }
+  .compare-entry-heading {
+    padding: 0 16px;
+  }
+  .compare-table-view {
+    padding: 12px;
+  }
+  .compare-view-tabs {
+    gap: 12px;
+  }
+}
+</style>

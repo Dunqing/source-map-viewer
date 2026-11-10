@@ -7,8 +7,7 @@ const suspiciousMappings = computed(() => store.splitTokenSegmentSet.size);
 </script>
 
 <template>
-  <div v-if="store.stats" class="p-4 border-l border-edge bg-surface w-64 overflow-y-auto text-sm">
-    <h3 class="font-medium mb-3 text-fg">Source Map Stats</h3>
+  <div v-if="store.stats" class="p-4 text-sm">
     <dl class="space-y-2">
       <div class="flex justify-between">
         <dt class="text-fg-muted">Mappings</dt>

@@ -2,14 +2,15 @@
 import { nextTick, ref, watch } from "vue";
 import CodePanel from "./CodePanel.vue";
 import SourceTabs from "./SourceTabs.vue";
+import WorkspaceDialog from "./WorkspaceDialog.vue";
 import MappingConnector from "./MappingConnector.vue";
 import { useSourceMapStore } from "../stores/sourceMap";
 import type { MappingSegment } from "../core/types";
 
 /**
  * The reusable inner half of the main viewer: original code on the left,
- * generated code on the right, mapping connector arrows between, source
- * tabs on top when there are multiple sources. All hover/click sync
+ * generated code on the right, mapping connector arrows between, and a
+ * source picker in the filename header. All hover/click sync
  * between the two panels and source-side switching wires through the
  * injected `useSourceMapStore`.
  *
@@ -31,6 +32,7 @@ const props = defineProps<{
 }>();
 
 const store = useSourceMapStore();
+const showSources = ref(false);
 
 const originalPanelRef = ref<InstanceType<typeof CodePanel> | null>(null);
 const generatedPanelRef = ref<InstanceType<typeof CodePanel> | null>(null);
@@ -75,13 +77,29 @@ defineExpose({ originalPanelRef, generatedPanelRef });
 
 <template>
   <div class="flex flex-col overflow-hidden flex-1 min-h-0">
-    <SourceTabs v-if="store.sourceCount > 1" />
-    <div class="flex-1 flex overflow-hidden relative min-h-0">
+    <WorkspaceDialog
+      :open="showSources"
+      label="Original sources"
+      title="Original sources"
+      @close="showSources = false"
+    >
+      <SourceTabs class="file-list" @select="showSources = false" />
+    </WorkspaceDialog>
+    <div class="workspace-panes">
       <!-- Left: Original code -->
-      <div class="flex-1 flex flex-col border-r border-edge min-w-0">
-        <div class="px-3 py-1 text-xs font-medium text-fg-muted border-b border-edge bg-muted">
-          Original code
-        </div>
+      <div class="workspace-pane">
+        <header class="workspace-code-header">
+          <button
+            type="button"
+            :title="store.activeSourceName"
+            aria-haspopup="dialog"
+            @click="showSources = true"
+          >
+            {{ store.activeSourceName
+            }}<small v-if="store.sourceCount > 1"> ({{ store.sourceCount }})</small>
+          </button>
+          <span>Original</span>
+        </header>
         <CodePanel
           ref="originalPanelRef"
           :code="store.activeSourceContent"
@@ -94,10 +112,15 @@ defineExpose({ originalPanelRef, generatedPanelRef });
       </div>
 
       <!-- Right: Generated code -->
-      <div class="flex-1 flex flex-col min-w-0">
-        <div class="px-3 py-1 text-xs font-medium text-fg-muted border-b border-edge bg-muted">
-          Generated code
-        </div>
+      <div class="workspace-pane">
+        <header class="workspace-code-header">
+          <span
+            class="workspace-filename"
+            :title="props.generatedFilename ?? store.parsedData?.file ?? 'output.js'"
+            >{{ props.generatedFilename ?? store.parsedData?.file ?? "output.js" }}</span
+          >
+          <span>Generated</span>
+        </header>
         <CodePanel
           ref="generatedPanelRef"
           :code="store.generatedCode"

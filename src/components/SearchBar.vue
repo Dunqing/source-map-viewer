@@ -15,6 +15,11 @@ const emit = defineEmits<{
 const query = ref("");
 const inputRef = ref<HTMLInputElement | null>(null);
 
+function focusInput() {
+  nextTick(() => inputRef.value?.focus());
+}
+defineExpose({ focusInput });
+
 watch(
   () => props.visible,
   (v) => {
