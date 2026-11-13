@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onUnmounted } from "vue";
 import { useSourceMapStore } from "../src/stores/sourceMap";
-import { getPathSlug, NAVIGATION_EVENT } from "../src/composables/navigation";
-import { resolveSlug } from "../src/composables/useShareableUrl";
+import { getInlineSlug, getPathSlug, NAVIGATION_EVENT } from "../src/composables/navigation";
+import { decompressFromHash, resolveSlug } from "../src/composables/useShareableUrl";
 import { getCachedSession, isLocalSessionSlug } from "../src/composables/useSessionCollectionCache";
 import { scheduleCommonHighlighterPrewarm } from "../src/composables/useHighlighter";
 import LandingPage from "../src/pages/LandingPage.vue";
@@ -17,13 +17,14 @@ let cancelHighlighterWarmup = () => {};
 
 async function handleNavigation() {
   const generation = ++navigationGeneration;
-  const slug = getPathSlug();
+  // Fragments stay in the browser, so large inline payloads never hit HTTP URL limits.
+  const inlineSlug = window.location.pathname === "/" ? getInlineSlug() : "";
+  const slug = inlineSlug || getPathSlug();
   if (slug) {
     if ((slug === currentSlug || slug === store.sessionSlug) && store.parsedData) {
       // Same slug already loaded — skip redundant fetch
       currentSlug = slug;
     } else {
-      currentSlug = slug;
       const cachedSession = getCachedSession(slug);
       if (cachedSession) {
         store.loadSourceMapCollection(cachedSession.entries, 0, slug, cachedSession.label);
@@ -32,7 +33,7 @@ async function handleNavigation() {
         // this tab and may no longer exist after the tab has been closed.
         store.reset();
       } else {
-        const data = await resolveSlug(slug);
+        const data = inlineSlug ? await decompressFromHash(inlineSlug) : await resolveSlug(slug);
         if (generation !== navigationGeneration) return;
         if (data) {
           store.loadSourceMap(data.generatedCode, data.sourceMapJson);
@@ -40,6 +41,7 @@ async function handleNavigation() {
           store.reset();
         }
       }
+      currentSlug = slug;
     }
     // Let Vue flush all store reactive updates before mounting VisualizationPage.
     // Without this, mounting happens in the same flush cycle as loadSourceMap,
@@ -59,12 +61,14 @@ async function handleNavigation() {
 onMounted(() => {
   handleNavigation();
   window.addEventListener("popstate", handleNavigation);
+  window.addEventListener("hashchange", handleNavigation);
   window.addEventListener(NAVIGATION_EVENT, handleNavigation);
   cancelHighlighterWarmup = scheduleCommonHighlighterPrewarm();
 });
 
 onUnmounted(() => {
   window.removeEventListener("popstate", handleNavigation);
+  window.removeEventListener("hashchange", handleNavigation);
   window.removeEventListener(NAVIGATION_EVENT, handleNavigation);
   cancelHighlighterWarmup();
 });

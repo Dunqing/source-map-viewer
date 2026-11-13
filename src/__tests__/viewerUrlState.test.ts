@@ -82,6 +82,21 @@ describe("viewerUrlState", () => {
     ).toBe("/demo?entry=2&tab=3&stats=1&seg=4");
   });
 
+  it("preserves inline data when updating viewer state", () => {
+    expect(
+      buildViewerUrl(
+        "/",
+        {
+          activeGeneratedEntryIndex: 0,
+          activeSourceIndex: 2,
+          selectedSegmentIndex: null,
+          showStats: false,
+        },
+        "#data=compressed-payload",
+      ),
+    ).toBe("/?tab=2#data=compressed-payload");
+  });
+
   it("omits default state from the URL", () => {
     expect(
       buildViewerUrl("/demo", {

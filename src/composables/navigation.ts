@@ -5,6 +5,10 @@ export function getPathSlug(pathname = window.location.pathname): string {
   return pathMatch ? pathMatch[1] : "";
 }
 
+export function getInlineSlug(hash = window.location.hash): string {
+  return new URLSearchParams(hash.slice(1)).get("data") ?? "";
+}
+
 export function navigateToPath(path: string): void {
   window.history.pushState(null, "", path);
   window.dispatchEvent(new CustomEvent(NAVIGATION_EVENT));
@@ -17,7 +21,8 @@ export function replaceCurrentPath(path: string): void {
 export function extractShareSlug(input: string): string {
   const trimmed = input.trim();
   try {
-    return new URL(trimmed).pathname.slice(1);
+    const url = new URL(trimmed);
+    return url.pathname === "/" ? getInlineSlug(url.hash) : url.pathname.slice(1);
   } catch {
     return trimmed;
   }

@@ -118,13 +118,17 @@ function syncUrlParams() {
   clearTimeout(urlSyncTimer);
   urlSyncTimer = window.setTimeout(() => {
     replaceCurrentPath(
-      buildViewerUrl(window.location.pathname, {
-        activeGeneratedEntryIndex: store.activeGeneratedEntryIndex,
-        activeSourceIndex: store.activeSourceIndex,
-        selectedSegmentIndex: selectedSegIndex.value,
-        showStats: showStats.value,
-        position: positionQuery.value,
-      }),
+      buildViewerUrl(
+        window.location.pathname,
+        {
+          activeGeneratedEntryIndex: store.activeGeneratedEntryIndex,
+          activeSourceIndex: store.activeSourceIndex,
+          selectedSegmentIndex: selectedSegIndex.value,
+          showStats: showStats.value,
+          position: positionQuery.value,
+        },
+        window.location.hash,
+      ),
     );
   }, 16);
 }
