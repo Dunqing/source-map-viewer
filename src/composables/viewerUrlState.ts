@@ -50,6 +50,7 @@ export function readViewerUrlState(search: string): ViewerUrlState {
 export function buildViewerUrl(
   pathname: string,
   state: Omit<ViewerUrlState, "showMappings" | "position"> & { position?: PositionQuery | null },
+  hash = "",
 ): string {
   const params = new URLSearchParams();
   if (state.activeGeneratedEntryIndex > 0) {
@@ -74,5 +75,5 @@ export function buildViewerUrl(
     );
   }
   const search = params.toString();
-  return `${pathname}${search ? `?${search}` : ""}`;
+  return `${pathname}${search ? `?${search}` : ""}${hash}`;
 }

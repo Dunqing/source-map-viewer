@@ -56,6 +56,8 @@ The report includes original/generated code with line numbers, a mapping table w
 
 Uploads, pasted input, fetched URLs, and examples open as `local-…` viewer routes backed by tab-scoped `sessionStorage`; loading them does not create a remote share. These routes support same-tab reloads and back/forward navigation, but they are not portable to another tab or browser and cannot be restored after their tab session is discarded. Click **Share** to create a durable short URL, with the existing inline compressed URL as the fallback when the share API is unavailable.
 
+Integrations can open `/#data=<compressedPayload>` with the same UTF-8 JSON → deflate → base64url payload as inline path links (`generatedCode` and `sourceMapJson` string fields). The fragment is decoded only in the browser, avoids HTTP request-URI limits for large source maps, and does not create a remote share. Existing path links remain supported. Fragment URLs require a browser; server-side tools do not receive their payload.
+
 Use **Compare** to diff two source maps from shared viewer links, public asset URLs, pasted content, or local uploads. Starting a comparison from the viewer uses an inline compressed link and does not create a remote share. If both sides came from shareable links, compare state is preserved in `/compare?a=<id>&b=<id>`; otherwise the compare session stays local to the current tab. The comparison view shows a summary of mappings that are unchanged, changed, removed, or added, with expandable code context for each difference.
 
 Deep-link query params also work on viewer URLs:

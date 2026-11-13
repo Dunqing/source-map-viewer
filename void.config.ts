@@ -69,7 +69,7 @@ export default defineConfig({
     script: [
       {
         innerHTML:
-          "if(localStorage.getItem('source-map-viz-theme')==='dark'||(!localStorage.getItem('source-map-viz-theme')&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}if(location.pathname.length>1&&location.pathname!=='/compare'){document.documentElement.classList.add('has-share-slug')}",
+          "if(localStorage.getItem('source-map-viz-theme')==='dark'||(!localStorage.getItem('source-map-viz-theme')&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}if((location.pathname.length>1&&location.pathname!=='/compare')||(location.pathname==='/'&&new URLSearchParams(location.hash.slice(1)).has('data'))){document.documentElement.classList.add('has-share-slug')}",
       },
     ],
   },

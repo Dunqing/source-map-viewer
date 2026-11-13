@@ -23,6 +23,10 @@ describe("useShareableUrl", () => {
     expect(result).toBeNull();
   });
 
+  it("returns null for valid base64 containing invalid compressed data", async () => {
+    expect(await decompressFromHash(btoa("not deflated data"))).toBeNull();
+  });
+
   it("returns null for valid compressed JSON with wrong shape", async () => {
     // Compress a valid JSON object that doesn't match ShareableData
     await compressToHash({ generatedCode: "x", sourceMapJson: '{"version":3}' });

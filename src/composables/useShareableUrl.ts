@@ -60,8 +60,8 @@ export async function decompressFromHash(hash: string): Promise<ShareableData | 
     const writer = ds.writable.getWriter();
     const writePromise = writer.write(compressed).then(() => writer.close());
 
-    const decompressed = await readStream(ds.readable);
-    await writePromise;
+    // Observe both failures so corrupt data cannot leave a rejected write unhandled.
+    const [decompressed] = await Promise.all([readStream(ds.readable), writePromise]);
     const json = new TextDecoder().decode(decompressed);
     const parsed = JSON.parse(json);
     if (!isShareableData(parsed)) return null;
