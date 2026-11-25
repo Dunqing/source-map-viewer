@@ -4,6 +4,7 @@ import { resolveSlug, type ShareableData } from "../src/composables/useShareable
 import { useTheme } from "../src/composables/useTheme";
 import CompareView from "../src/pages/CompareView.vue";
 import CompareLanding from "../src/pages/CompareLanding.vue";
+import { COMPARE_SIDE_LABELS } from "../src/constants";
 
 useTheme();
 
@@ -20,16 +21,15 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const resolved = ref(false);
 
-function formatCompareLabel(prefix: "A" | "B", slug: string): string {
-  return `${prefix} (${slug.slice(0, 8)}...)`;
-}
-
-async function resolveCompareEntry(prefix: "A" | "B", slug: string): Promise<CompareEntry> {
+async function resolveCompareEntry(
+  side: keyof typeof COMPARE_SIDE_LABELS,
+  slug: string,
+): Promise<CompareEntry> {
   const data = await resolveSlug(slug);
   if (!data) {
-    throw new Error(`Failed to load source map ${prefix} (${slug})`);
+    throw new Error(`Failed to load the ${COMPARE_SIDE_LABELS[side].toLowerCase()} source map`);
   }
-  return { ...data, label: formatCompareLabel(prefix, slug) };
+  return { ...data, label: slug.length > 12 ? `${slug.slice(0, 12)}…` : slug };
 }
 
 onMounted(async () => {
@@ -50,11 +50,11 @@ onMounted(async () => {
   try {
     if (slugA.value && slugB.value) {
       [entryA.value, entryB.value] = await Promise.all([
-        resolveCompareEntry("A", slugA.value),
-        resolveCompareEntry("B", slugB.value),
+        resolveCompareEntry("a", slugA.value),
+        resolveCompareEntry("b", slugB.value),
       ]);
     } else if (slugA.value) {
-      prefilledA.value = await resolveCompareEntry("A", slugA.value);
+      prefilledA.value = await resolveCompareEntry("a", slugA.value);
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load source maps";

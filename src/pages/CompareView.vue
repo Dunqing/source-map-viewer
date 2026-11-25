@@ -13,7 +13,7 @@ import PatternSummary from "../components/PatternSummary.vue";
 import CompareCodePane from "../components/CompareCodePane.vue";
 import { provideCrossPaneHover } from "../composables/useCrossPaneHover";
 import { provideCrossPaneScroll } from "../composables/useCrossPaneScroll";
-import { LINE_HEIGHT } from "../constants";
+import { COMPARE_SIDE_LABELS, LINE_HEIGHT } from "../constants";
 
 const showFiles = ref(false);
 const showDetails = ref(false);
@@ -113,13 +113,13 @@ const indexA = computed(() => buildMappingIndex(parsedA.value.mappings));
 const indexB = computed(() => buildMappingIndex(parsedB.value.mappings));
 const duplicateSides = computed(() => [
   {
-    side: "A",
+    side: COMPARE_SIDE_LABELS.a,
     groups: findDuplicateGeneratedPositions(indexA.value),
     sources: parsedA.value.sources,
     names: parsedA.value.names,
   },
   {
-    side: "B",
+    side: COMPARE_SIDE_LABELS.b,
     groups: findDuplicateGeneratedPositions(indexB.value),
     sources: parsedB.value.sources,
     names: parsedB.value.names,
@@ -292,25 +292,8 @@ function viewerHref(slug?: string): string | null {
   return slug ? `/${slug}` : null;
 }
 
-/**
- * Pane title shown next to the side pill (A/B). Preference order:
- *   1. the sourcemap's `file` field (e.g. `before.js`) — most informative
- *   2. the slug, truncated like the top header chip — short and stable
- *   3. the share-flow label as a final fallback
- *
- * Skipping the share-flow label when a slug is available avoids the
- * "A A (slug...)" duplication, since `entryA.label` is itself
- * `"A (slug...)"` and the pill already shows the side.
- */
-function paneLabel(
-  parsedFile: string | undefined,
-  slug: string | undefined,
-  entryLabel: string,
-): string {
-  if (parsedFile && parsedFile.length > 0) return parsedFile;
-  if (slug) return slug.length > 12 ? `${slug.slice(0, 12)}...` : slug;
-  return entryLabel;
-}
+const filenameA = computed(() => parsedA.value.file || props.entryA.label);
+const filenameB = computed(() => parsedB.value.file || props.entryB.label);
 </script>
 
 <template>
@@ -338,22 +321,22 @@ function paneLabel(
     >
       <section
         v-for="side in [
-          { key: 'A', entry: entryA, slug: slugA, data: parsedA },
-          { key: 'B', entry: entryB, slug: slugB, data: parsedB },
+          { label: COMPARE_SIDE_LABELS.a, filename: filenameA, slug: slugA, data: parsedA },
+          { label: COMPARE_SIDE_LABELS.b, filename: filenameB, slug: slugB, data: parsedB },
         ]"
-        :key="side.key"
+        :key="side.label"
         class="mb-6 last:mb-0"
       >
-        <h3 class="file-heading">{{ side.key === "A" ? "A · Reference" : "B · Candidate" }}</h3>
+        <h3 class="file-heading">{{ side.label }}</h3>
         <a
           v-if="viewerHref(side.slug)"
           :href="viewerHref(side.slug)!"
           target="_blank"
           rel="noreferrer"
           class="text-sm underline underline-offset-4"
-          >{{ paneLabel(side.data.file, side.slug, side.entry.label) }}</a
+          >{{ side.filename }}</a
         >
-        <p v-else class="text-sm">{{ paneLabel(side.data.file, side.slug, side.entry.label) }}</p>
+        <p v-else class="text-sm">{{ side.filename }}</p>
         <ul class="mt-3 space-y-2 text-xs text-fg-muted">
           <li v-for="source in side.data.sources" :key="source" class="break-all">{{ source }}</li>
         </ul>
@@ -376,6 +359,16 @@ function paneLabel(
     <main v-if="urlStateReady" class="compare-workspace" :class="{ 'show-details': showDetails }">
       <section class="compare-main" aria-label="Source map comparison">
         <div v-show="activeTab === 'table'" class="compare-table-view">
+          <div class="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-fg-dim">
+            <div class="min-w-0 flex gap-2">
+              <strong>{{ COMPARE_SIDE_LABELS.a }}</strong>
+              <span class="truncate" :title="filenameA">{{ filenameA }}</span>
+            </div>
+            <div class="min-w-0 flex gap-2">
+              <strong>{{ COMPARE_SIDE_LABELS.b }}</strong>
+              <span class="truncate" :title="filenameB">{{ filenameB }}</span>
+            </div>
+          </div>
           <PatternSummary
             :patterns="patterns"
             :selected-pattern-key="selectedPatternKey"
@@ -415,17 +408,17 @@ function paneLabel(
           <section
             class="compare-entry"
             :style="{ height: paneHeightA }"
-            aria-label="A reference code"
+            :aria-label="`${COMPARE_SIDE_LABELS.a} code`"
           >
             <header class="compare-entry-heading">
-              <strong>A</strong><span>{{ paneLabel(parsedA.file, slugA, entryA.label) }}</span
-              ><small>Reference</small>
+              <strong>{{ COMPARE_SIDE_LABELS.a }}</strong>
+              <span :title="filenameA">{{ filenameA }}</span>
             </header>
             <CompareCodePane
               class="flex-1 min-h-0"
               :generated-code="entryA.generatedCode"
               :source-map-json="entryA.sourceMapJson"
-              :filename="parsedA.file ?? entryA.label"
+              :filename="filenameA"
               :gen-line-statuses="lineStatusesA"
               side="a"
               :entries="diffResult.entries"
@@ -434,17 +427,17 @@ function paneLabel(
           <section
             class="compare-entry"
             :style="{ height: paneHeightB }"
-            aria-label="B candidate code"
+            :aria-label="`${COMPARE_SIDE_LABELS.b} code`"
           >
             <header class="compare-entry-heading">
-              <strong>B</strong><span>{{ paneLabel(parsedB.file, slugB, entryB.label) }}</span
-              ><small>Candidate</small>
+              <strong>{{ COMPARE_SIDE_LABELS.b }}</strong>
+              <span :title="filenameB">{{ filenameB }}</span>
             </header>
             <CompareCodePane
               class="flex-1 min-h-0"
               :generated-code="entryB.generatedCode"
               :source-map-json="entryB.sourceMapJson"
-              :filename="parsedB.file ?? entryB.label"
+              :filename="filenameB"
               :gen-line-statuses="lineStatusesB"
               side="b"
               :entries="diffResult.entries"
@@ -465,7 +458,7 @@ function paneLabel(
         </header>
         <div class="p-4 text-xs text-fg-dim space-y-4">
           <section>
-            <h3 class="font-medium mb-2">A · Reference</h3>
+            <h3 class="font-medium mb-2">{{ COMPARE_SIDE_LABELS.a }}</h3>
             <p>
               {{ indexA.length }} raw mappings<span v-if="diagnosticsA.length"
                 >, {{ diagnosticsA.length }} issues</span
@@ -476,7 +469,7 @@ function paneLabel(
             </p>
           </section>
           <section>
-            <h3 class="font-medium mb-2">B · Candidate</h3>
+            <h3 class="font-medium mb-2">{{ COMPARE_SIDE_LABELS.b }}</h3>
             <p>
               {{ indexB.length }} raw mappings<span v-if="diagnosticsB.length"
                 >, {{ diagnosticsB.length }} issues</span
@@ -608,18 +601,12 @@ function paneLabel(
   font-size: 12px;
 }
 .compare-entry-heading strong {
-  font-size: 11px;
-  color: var(--c-text-3);
+  color: var(--c-text);
 }
 .compare-entry-heading span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.compare-entry-heading small {
-  margin-left: auto;
-  color: var(--c-text-3);
-  font-size: 11px;
 }
 .compare-large-file {
   padding: 35px;

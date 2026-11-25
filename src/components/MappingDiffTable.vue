@@ -8,6 +8,7 @@ import {
 import type { DiffEntry, DiffSummary } from "../core/diff";
 import type { MappingSegment } from "../core/types";
 import { extractGeneratedSnippet, extractOriginalSnippet } from "../core/snippets";
+import { COMPARE_SIDE_LABELS } from "../constants";
 import PointSnippetView from "./PointSnippetView.vue";
 
 const props = defineProps<{
@@ -525,7 +526,7 @@ function missingSide(entry: DiffEntry): "a" | "b" {
 }
 
 function sideTitle(side: "a" | "b"): string {
-  return side.toUpperCase();
+  return COMPARE_SIDE_LABELS[side];
 }
 
 function disappearedMappingTitle(entry: DiffEntry): string {
@@ -580,8 +581,8 @@ function previewEmptyText(type: "orig" | "gen", side: "a" | "b"): string {
 }
 
 function collapsedStatusLabel(entry: DiffEntry): string | null {
-  if (entry.status === "removed") return "only in A";
-  if (entry.status === "added") return "only in B";
+  if (entry.status === "removed") return `Only in ${sideTitle("a")}`;
+  if (entry.status === "added") return `Only in ${sideTitle("b")}`;
   return null;
 }
 
@@ -620,7 +621,7 @@ function statusTextClass(status: DiffEntry["status"]): string {
   <div>
     <!-- Summary bar -->
     <div
-      class="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface border border-edge text-xs font-mono mb-3"
+      class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 rounded-lg bg-surface border border-edge text-xs font-mono whitespace-nowrap mb-3"
     >
       <span class="text-fg-muted">{{ summary.same }} same</span>
       <span
@@ -667,11 +668,18 @@ function statusTextClass(status: DiffEntry["status"]): string {
         <!-- Entry row -->
         <div
           class="flex items-start gap-2 px-3 py-1.5 rounded-lg border border-edge text-xs font-mono cursor-pointer"
-          :class="[statusClass(entry.status), expandedEntry === entry ? 'rounded-b-none' : '']"
+          :class="[
+            statusClass(entry.status),
+            expandedEntry === entry ? 'rounded-b-none' : '',
+            collapsedStatusLabel(entry) ? 'max-sm:flex-wrap' : '',
+          ]"
           @click="toggleExpand(entry)"
         >
           <!-- Status -->
-          <div class="mt-0.5 shrink-0 flex items-center gap-1.5">
+          <div
+            class="mt-0.5 shrink-0 flex items-center gap-1.5"
+            :class="{ 'max-sm:w-full': collapsedStatusLabel(entry) }"
+          >
             <span class="font-bold w-4 text-center" :class="statusTextClass(entry.status)">
               {{ statusIcon(entry.status) }}
             </span>
@@ -697,7 +705,7 @@ function statusTextClass(status: DiffEntry["status"]): string {
               </div>
               <div v-else-if="isOriginalChanged(entry)" class="space-y-0.5">
                 <div class="flex items-center gap-1.5">
-                  <span class="text-red-500 font-semibold w-6">A:</span>
+                  <span class="text-red-500 font-semibold shrink-0">{{ sideTitle("a") }}</span>
                   <span
                     v-if="shouldShowSourceName(entry)"
                     class="text-fg-muted text-[10px] shrink-0"
@@ -714,7 +722,9 @@ function statusTextClass(status: DiffEntry["status"]): string {
                   </code>
                 </div>
                 <div class="flex items-center gap-1.5">
-                  <span class="text-green-600 dark:text-green-400 font-semibold w-6">B:</span>
+                  <span class="text-green-600 dark:text-green-400 font-semibold shrink-0">{{
+                    sideTitle("b")
+                  }}</span>
                   <span
                     v-if="shouldShowSourceName(entry)"
                     class="text-fg-muted text-[10px] shrink-0"
@@ -760,14 +770,19 @@ function statusTextClass(status: DiffEntry["status"]): string {
           <span class="text-fg-muted shrink-0 mt-0.5">→</span>
 
           <!-- Generated position -->
-          <div class="text-fg-muted w-16 shrink-0 mt-0.5">
+          <div
+            class="text-fg-muted shrink-0 mt-0.5"
+            :class="isGeneratedChanged(entry) ? 'min-w-16' : 'w-16'"
+          >
             <template v-if="isGeneratedChanged(entry)">
               <div class="flex items-center gap-1">
-                <span class="text-red-500 font-semibold">A:</span>
+                <span class="text-red-500 font-semibold">{{ sideTitle("a") }}</span>
                 <span>{{ generatedPos(entry, "a") }}</span>
               </div>
               <div class="flex items-center gap-1">
-                <span class="text-green-600 dark:text-green-400 font-semibold">B:</span>
+                <span class="text-green-600 dark:text-green-400 font-semibold">{{
+                  sideTitle("b")
+                }}</span>
                 <span>{{ generatedPos(entry, "b") }}</span>
               </div>
             </template>
@@ -783,18 +798,14 @@ function statusTextClass(status: DiffEntry["status"]): string {
           </div>
 
           <!-- Generated code snippet -->
-          <div class="max-w-56 mt-0.5 shrink-0 min-w-0">
+          <div class="max-w-56 mt-0.5 min-w-0">
             <template v-if="isGeneratedChanged(entry)">
               <div class="flex items-center gap-1.5 min-w-0">
-                <span class="text-red-500 font-semibold w-4 shrink-0">A:</span>
                 <code class="text-red-500 truncate">
                   <PointSnippetView :snippet="generatedDiffSnippet(entry, 'a')" tone="red" />
                 </code>
               </div>
               <div class="flex items-center gap-1.5 min-w-0">
-                <span class="text-green-600 dark:text-green-400 font-semibold w-4 shrink-0"
-                  >B:</span
-                >
                 <code class="text-green-600 dark:text-green-400 truncate">
                   <PointSnippetView :snippet="generatedDiffSnippet(entry, 'b')" tone="green" />
                 </code>
@@ -967,12 +978,11 @@ function statusTextClass(status: DiffEntry["status"]): string {
 
           <template v-else>
             <div class="grid grid-cols-2 divide-x divide-edge">
-              <!-- Side A -->
               <div>
                 <div
                   class="px-2 py-1 text-xs font-semibold text-fg-muted bg-muted border-b border-edge"
                 >
-                  Original (A) → {{ originalSourceName(entry, "a") }}
+                  Original ({{ sideTitle("a") }}) → {{ originalSourceName(entry, "a") }}
                 </div>
                 <div
                   v-if="getContextLines(entry, 'a', 'orig').length === 0"
@@ -996,7 +1006,7 @@ function statusTextClass(status: DiffEntry["status"]): string {
                 <div
                   class="px-2 py-1 text-xs font-semibold text-fg-muted bg-muted border-y border-edge"
                 >
-                  Generated (A)
+                  Generated ({{ sideTitle("a") }})
                 </div>
                 <div
                   v-if="getContextLines(entry, 'a', 'gen').length === 0"
@@ -1019,12 +1029,11 @@ function statusTextClass(status: DiffEntry["status"]): string {
 </span></template></pre>
               </div>
 
-              <!-- Side B -->
               <div>
                 <div
                   class="px-2 py-1 text-xs font-semibold text-fg-muted bg-muted border-b border-edge"
                 >
-                  Original (B) → {{ originalSourceName(entry, "b") }}
+                  Original ({{ sideTitle("b") }}) → {{ originalSourceName(entry, "b") }}
                 </div>
                 <div
                   v-if="getContextLines(entry, 'b', 'orig').length === 0"
@@ -1048,7 +1057,7 @@ function statusTextClass(status: DiffEntry["status"]): string {
                 <div
                   class="px-2 py-1 text-xs font-semibold text-fg-muted bg-muted border-y border-edge"
                 >
-                  Generated (B)
+                  Generated ({{ sideTitle("b") }})
                 </div>
                 <div
                   v-if="getContextLines(entry, 'b', 'gen').length === 0"

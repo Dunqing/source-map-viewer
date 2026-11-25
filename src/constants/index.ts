@@ -1,6 +1,8 @@
 export const APP_NAME = "Source Map Viewer";
 export const APP_DESCRIPTION = "Inspect and debug source map mappings, visually";
 
+export const COMPARE_SIDE_LABELS = { a: "Reference", b: "Candidate" } as const;
+
 // Number of segment highlight colors (--seg-0 … --seg-6 in layout.vue)
 export const SEGMENT_COLOR_COUNT = 7;
 

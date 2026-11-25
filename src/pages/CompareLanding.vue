@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import IconArrowLeft from "~icons/carbon/arrow-left";
 import { buildComparePath, extractShareSlug } from "../composables/navigation";
+import { COMPARE_SIDE_LABELS } from "../constants";
 
 interface CompareEntry {
   generatedCode: string;
@@ -24,11 +25,11 @@ async function handleCompare() {
   const slugB = extractShareSlug(urlB.value);
 
   if (!props.prefilledA && !slugA) {
-    error.value = "Please enter URL A";
+    error.value = "Enter the reference source map URL";
     return;
   }
   if (!slugB) {
-    error.value = "Please enter URL B";
+    error.value = "Enter the candidate source map URL";
     return;
   }
 
@@ -56,8 +57,8 @@ async function handleCompare() {
         <p>
           {{
             prefilledA
-              ? "Enter a second URL to compare against"
-              : "Paste two viewer URLs to diff their mappings"
+              ? "The source map you opened is the reference. Add a candidate to compare against it."
+              : "Paste two viewer URLs to see what changed from the reference to the candidate."
           }}
         </p>
       </div>
@@ -67,14 +68,19 @@ async function handleCompare() {
       </div>
 
       <div class="compare-inputs">
-        <!-- URL A -->
         <div class="compare-input-row">
-          <label class="compare-label">URL A</label>
+          <span v-if="prefilledA" class="compare-label"
+            >{{ COMPARE_SIDE_LABELS.a }} source map</span
+          >
+          <label v-else class="compare-label" for="compare-reference"
+            >{{ COMPARE_SIDE_LABELS.a }} source map URL</label
+          >
           <div v-if="prefilledA" class="compare-prefilled">
             {{ prefilledA.label }}
           </div>
           <input
             v-else
+            id="compare-reference"
             v-model="urlA"
             class="compare-field"
             placeholder="https://source-map-viewer.void.app/abc123 or just abc123"
@@ -82,16 +88,19 @@ async function handleCompare() {
           />
         </div>
 
-        <!-- URL B -->
         <div class="compare-input-row">
-          <label class="compare-label">URL B</label>
+          <label class="compare-label" for="compare-candidate"
+            >{{ COMPARE_SIDE_LABELS.b }} source map URL</label
+          >
           <input
+            id="compare-candidate"
             v-model="urlB"
+            aria-describedby="compare-candidate-help"
             class="compare-field"
             placeholder="https://source-map-viewer.void.app/xyz789 or just xyz789"
             @keydown.enter="handleCompare"
           />
-          <p class="compare-help">
+          <p id="compare-candidate-help" class="compare-help">
             Open another source map in the viewer, click Share, then paste the URL here
           </p>
         </div>
@@ -106,7 +115,7 @@ async function handleCompare() {
       </button>
 
       <p v-if="!prefilledA" class="compare-tip">
-        Tip: you can also click Compare in the visualization toolbar to pre-fill URL A
+        Click Compare in the viewer toolbar to use the open map as the reference.
       </p>
     </div>
   </div>

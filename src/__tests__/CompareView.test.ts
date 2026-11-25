@@ -154,15 +154,17 @@ describe("CompareView raw mapping comparison", () => {
     expect(wrapper.text()).toContain("7 raw mappings");
     expect(wrapper.text()).not.toContain("No differences");
     const row = table.find(".space-y-1 .cursor-pointer");
-    expect(row.text()).toContain("only in A");
+    expect(row.text()).toContain("Only in Reference");
     expect(row.text()).toContain("2:2");
     expect(row.text()).toContain("2:1");
     await row.trigger("click");
-    expect(table.text()).toContain("Original (A) @ 2:2");
+    expect(table.text()).toContain("Original (Reference) @ 2:2");
     expect(table.text()).toContain("original 2:9 and generated 2:1");
 
     const inspector = wrapper.find("details");
-    expect(inspector.find("summary").text()).toMatch(/Duplicate generated positions\s+A: 1\s*B: 0/);
+    expect(inspector.find("summary").text()).toMatch(
+      /Duplicate generated positions\s+Reference: 1\s*Candidate: 0/,
+    );
     expect(inspector.text()).toContain("input.ts:2:2");
     expect(inspector.text()).toContain("input.ts:2:9");
     expect(inspector.findAll("li")).toHaveLength(2);
@@ -183,7 +185,7 @@ describe("CompareView raw mapping comparison", () => {
   it("flags duplicate positions even when the maps are identical and same rows are hidden", async () => {
     const wrapper = await mountCompare(reproEntryA, { ...reproEntryA, label: "identical.js" });
     expect(wrapper.findComponent(MappingDiffTable).props("summary").same).toBe(8);
-    expect(wrapper.find("details summary").text()).toMatch(/A: 1\s*B: 1/);
+    expect(wrapper.find("details summary").text()).toMatch(/Reference: 1\s*Candidate: 1/);
     expect(wrapper.find("details").findAll("li")).toHaveLength(4);
     expect(
       wrapper.findComponent(MappingDiffTable).findAll(".space-y-1 .cursor-pointer"),
